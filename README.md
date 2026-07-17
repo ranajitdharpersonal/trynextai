@@ -18,9 +18,9 @@
 
 ## 🏆 OpenAI Build Week Hackathon: How We Built with GPT-5.6 & Codex
 
-TryNext AI's core Swarm Intelligence is exclusively powered by OpenAI's frontier models to achieve zero-hallucination agentic coding:
-* **GPT-5.6 (Manager & Evaluator Agents):** We leverage the advanced reasoning of GPT-5.6 to act as our system architects. It analyzes the user's natural language voice commands (across 100+ languages), plans the exact architecture, and rigorously tests the final output for logical flaws before deployment.
-* **Codex (The Coder Agent):** The actual heavy lifting of writing flawless Next.js 15, Tailwind CSS, and API integration is powered directly by Codex. Our Coder Agent uses Codex to translate the Manager's blueprint into a production-ready repository.
+TryNext AI's core Swarm Intelligence is exclusively powered by OpenAI's frontier models, while the system itself was architected using Codex:
+* **GPT-5.6 (The Runtime Swarm):** Our 3-tier agentic architecture (Manager ➔ Coder ➔ Evaluator) is powered entirely by the stable GPT-5.6 API in production. It analyzes voice commands, writes Next.js/Tailwind code, and self-heals logic errors.
+* **Codex (The Architect's Co-Pilot):** We strictly followed the "Build with Codex" philosophy. The complex Swarm intelligence logic, the AWS Bedrock circuit breaker, and the Zero-Stack AWS DynamoDB integration you see in this repository were rapidly prototyped, refactored, and tested using the Codex agent via ChatGPT. Codex accelerated our development speed by 10x.
 
 ---
 
@@ -36,8 +36,8 @@ We are lowering the barrier to entry for the next billion users by turning **nat
 * 🌐 **Live Web Clone Engine:** Command the AI to search the live web, inspect popular website architectures, and instantly clone/copy their UI patterns into your project as per your voice prompt.
 * 💾 **Zero Stack Data Persistence (AWS DynamoDB):** Built explicitly for the "Hack the Zero Stack" philosophy. Every deployed app's state, premium tier status, and metadata are seamlessly persisted and managed in real-time using AWS DynamoDB, bypassing complex backend provisioning.
 * 🚀 **One-Click Public Launch (Powered by Vercel):** Instantly push your generated application from the local sandbox directly to a live, public URL with a single click. We leverage Vercel's edge network to give users a production-ready link in seconds.
-* 🤖 **Swarm Intelligence:** A 3-tier agentic architecture powered by OpenAI (`GPT-5.6 Manager ➔ Codex Builder ➔ GPT-5.6 Evaluator`) working in perfect sync to eliminate hallucinations.
-* 🛡️ **Unbreakable Infrastructure:** Auto-Failover circuit breakers (`OpenAI API` ➔ `Groq Llama 3` ➔ `HF Qwen`) ensure 100% uptime even during API limits.
+* 🤖 **Swarm Intelligence:** A 3-tier agentic architecture powered by OpenAI (`GPT-5.6 Manager ➔ GPT-5.6 Builder ➔ GPT-5.6 Evaluator`) working in perfect sync to eliminate hallucinations.
+* 🛡️ **Unbreakable Infrastructure:** Auto-Failover circuit breakers (`OpenAI GPT-5.6 API` ➔ `AWS Bedrock Llama 3.3` ➔ `HF Qwen`) ensure 100% uptime even during API limits.
 * 🌍 **Multilingual Intelligence (Breaking the Language Barrier):** TryNext AI supports 100+ local languages. You don't need to know English to build software; speak in your native tongue, and the AI understands the architectural intent.
 * 🧠 **Live Brain View & Voice Interaction:** It’s not a silent process. The system provides real-time "Brain View" of the Swarm logic, and once the task is completed, it speaks back to the user with a human-like persona to confirm execution and gather feedback.
 
@@ -125,8 +125,8 @@ graph TD
     end
 
     subgraph "🧠 The Brains"
-        G{"OpenAI (GPT-5.6 / Codex)"}
-        L{"Groq (Llama 3.3)"}
+        G{"OpenAI (GPT-5.6)"}
+        L{"AWS Bedrock (Llama 3.3)"}
         Q{"HF (Qwen 2.5)"}
         C -.->|Inference Request| G
         G -- "Success" --> Output[Valid Logic]
@@ -187,7 +187,7 @@ graph TD
 * **The Manager Agent (Planner):** The strategic brain. It listens to the user's voice transcript, analyzes the core intent, and breaks the project down into an actionable architectural blueprint.
 * **The Coder Agent (Builder & API Hub):** The central execution engine. It doesn't just write Next.js 15 + Tailwind CSS code; it actively controls the **Live Web Clone API** to extract UI from external sites and the **Modify API** to inject voice-commanded changes into the live logic.
 * **The Evaluator Agent (QA):** The strict gatekeeper. It reviews the Coder's generated application in an isolated loop. If the UI breaks or logic fails, it forces the Coder to rewrite it *before* the user ever sees it in the Sandbox.
-* **The Circuit Breaker (Unbreakable LLM Routing):** Ensures the AI never goes down. All Coder inference requests hit Gemini 3 Pro first. If it hits a rate limit or 5xx error, it instantly auto-routes to Groq (Llama 3.3) or HuggingFace (Qwen 2.5) with zero user interruption.
+* **The Circuit Breaker (Unbreakable LLM Routing):** Ensures the AI never goes down. All inference requests are routed to OpenAI first. If the request fails because of quota limits, timeouts, or service errors, the circuit breaker automatically falls back to Llama 3.3 and finally Qwen 2.5, ensuring uninterrupted service.
 * **Interactive Sandbox & Voice Mod:** The generated app runs in a live Next.js sandbox where users can continuously issue new voice commands to tweak the UI or logic in real-time.
 * **One-Click Vercel Deployment:** Once satisfied, the sandbox application is pushed directly to Vercel's Edge network, generating a live public URL in seconds. No terminal commands needed.
 * **AWS DynamoDB State Management:** App deployment details, user access links, and PRO tier upgrades are instantly verified via Webhooks and stored securely in AWS DynamoDB without spinning up dedicated backend servers.
@@ -210,7 +210,8 @@ TryNext AI doesn't just generate code; it tracks its own footprint. I have integ
 I didn't just use wrappers; I built a robust, cloud-native architecture.
 
 * **Frontend & Sandbox:** ![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=next.js&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white) ![Framer Motion](https://img.shields.io/badge/Framer_Motion-0055FF?style=for-the-badge&logo=framer&logoColor=white)
-* **The Swarm Engine:** ![OpenAI GPT-5.6](https://img.shields.io/badge/OpenAI_GPT--5.6-412991?style=for-the-badge&logo=openai&logoColor=white) ![OpenAI Codex](https://img.shields.io/badge/OpenAI_Codex-00A67E?style=for-the-badge&logo=openai&logoColor=white) ![Llama 3](https://img.shields.io/badge/Groq_Llama_3-F56565?style=for-the-badge) ![Qwen](https://img.shields.io/badge/HF_Qwen-FF9D00?style=for-the-badge)
+* **The Swarm Engine:** ![OpenAI GPT-5.6](https://img.shields.io/badge/OpenAI_GPT--5.6-412991?style=for-the-badge&logo=openai&logoColor=white) ![AWS Bedrock](https://img.shields.io/badge/AWS_Bedrock_Llama_3-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white) ![Qwen](https://img.shields.io/badge/HF_Qwen-FF9D00?style=for-the-badge)
+* **Development Co-Pilot:** ![OpenAI Codex](https://img.shields.io/badge/Built_with-OpenAI_Codex-00A67E?style=for-the-badge&logo=openai&logoColor=white)
 * **Infrastructure & Database:** ![Vercel](https://img.shields.io/badge/Vercel_Edge-000000?style=for-the-badge&logo=vercel&logoColor=white) ![AWS DynamoDB](https://img.shields.io/badge/AWS_DynamoDB-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white) ![GitHub API](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
 
 ---
@@ -264,11 +265,18 @@ GITHUB_TOKEN=for_ai_doctor_prs
 GITHUB_USERNAME=ranajitdharpersonal
 GITHUB_REPO=trynext-ai
 TRYNEXT_DEPLOY_KEY=your_secured_vercel_token
-# Zero Stack AWS & Payment Integration
+
+# Zero Stack AWS (Database)
 AWS_REGION=ap-south-1
 AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 AWS_DYNAMODB_TABLE_NAME=TryNext_Deployments
+
+# AI Engine AWS Bedrock Keys
+BEDROCK_AWS_REGION=us-east-1
+BEDROCK_AWS_ACCESS_KEY_ID=your_bedrock_access_key
+BEDROCK_AWS_SECRET_ACCESS_KEY=your_bedrock_secret_key
+
 RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
 ```
 (Security Note: The Vercel deployment token is secured under a custom namespace TRYNEXT_ to bypass default cloud system restrictions and prevent environment clashes).
