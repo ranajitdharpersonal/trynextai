@@ -1,299 +1,309 @@
 <div align="center">
-  <img src="public/banner.png" alt="TryNext AI - For the Next Billion Users" width="50%" />
-  
-  <br><br><p>
-  <a href="https://trynext-ai.vercel.app" target="_blank">
-    <img src="https://img.shields.io/badge/Vercel-Live_Demo-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel Live Demo" />
-  </a>
-  <img src="https://img.shields.io/badge/Zero_Stack-AWS_DynamoDB-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white" alt="AWS DynamoDB" />
-  <img src="https://img.shields.io/badge/Monetization-Razorpay-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF" alt="Razorpay Webhook" />
-  <img src="https://img.shields.io/badge/Status-Production_Ready-10b981?style=for-the-badge" alt="Production Ready" />
-  <img src="https://img.shields.io/badge/Built_For-Next_Billion_Users-8b5cf6?style=for-the-badge" alt="Next Billion Users" />
-  <img src="https://img.shields.io/badge/©_2026-Ranajit_Dhar-0ea5e9?style=for-the-badge" alt="Copyright Ranajit Dhar 2026" />
-</p>
-  <p><em>Engineered by Ranajit Dhar • Built for the 2026 Developer Ecosystem</em></p>
+  <img src="public/banner.png" alt="TryNext AI — voice-to-software factory" width="72%" />
+
+  <h1>TryNext AI</h1>
+  <p><strong>Describe an app in your voice. TryNext AI plans it, builds it, evaluates it, and launches it.</strong></p>
+  <p>Built for OpenAI Build Week with GPT-5.6 and Codex.</p>
+
+  <p>
+    <a href="https://trynext-ai.vercel.app"><img src="https://img.shields.io/badge/Live_Demo-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Live demo" /></a>
+    <a href="https://github.com/ranajitdharpersonal/trynextai"><img src="https://img.shields.io/badge/Source-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Source code" /></a>
+    <img src="https://img.shields.io/badge/Track-Work_%26_Productivity-2563eb?style=for-the-badge" alt="Work and Productivity track" />
+    <img src="https://img.shields.io/badge/License-MIT-10b981?style=for-the-badge" alt="MIT License" />
+  </p>
 </div>
 
 ---
 
-## 🏆 OpenAI Build Week Hackathon: How We Built with GPT-5.6 & Codex
+## OpenAI Build Week at a glance
 
-TryNext AI's core Swarm Intelligence is exclusively powered by OpenAI's frontier models, while the system itself was architected using Codex:
-* **GPT-5.6 (The Runtime Swarm):** Our 3-tier agentic architecture (Manager ➔ Coder ➔ Evaluator) is powered entirely by the stable GPT-5.6 API in production. It analyzes voice commands, writes Next.js/Tailwind code, and self-heals logic errors.
-* **Codex (The Architect's Co-Pilot):** We strictly followed the "Build with Codex" philosophy. The complex Swarm intelligence logic, the AWS Bedrock circuit breaker, and the Zero-Stack AWS DynamoDB integration you see in this repository were rapidly prototyped, refactored, and tested using the Codex agent via ChatGPT. Codex accelerated our development speed by 10x.
+TryNext AI is a **Work & Productivity** project for the OpenAI Build Week challenge. It turns a natural-language or voice request into a working web application, helping founders and teams move from an idea to a testable workflow faster while keeping the build loop observable and recoverable:
 
----
+```text
+Voice request → Manager (route)
+                 ├─ CREATE  → Architect (SRS) → Coder → Evaluator → Sandbox
+                 ├─ MODIFY  → Modify API ─────────────────────────→ Sandbox
+                 └─ CLONE   → Clone API ──────────────────────────→ Sandbox
 
-## ⚡ Judge TL;DR (30-Second Overview)
+CREATE failure → one repair pass before the result is shown
 
-**TryNext AI is not just another code generator. It is an autonomous, self-healing software factory.**
+Inference route: OpenAI GPT-5.6 → AWS Bedrock Llama 3.3 → Hugging Face Qwen 2.5
+```
 
-We are lowering the barrier to entry for the next billion users by turning **natural voice commands into enterprise-grade web applications.**
+The primary GPT-5.6 route is used when available. The fallback chain is request-scoped: a provider failure is recorded and the same request continues through the next provider. This keeps the user-facing workflow resilient without claiming that any external API can provide literal 100% uptime.
 
-* 🌍 **Massive ROI (The Next Billion Users):** A digital equalizer that eliminates the need for expensive dev agencies or CS degrees. Zero coding required—just your voice and a vision.
-* 💎 **The "AI Doctor" (Self-Healing):** Continuous live system monitoring that scans your codebase, optimizes logic, and automatically generates direct GitHub Pull Requests (PRs) without breaking core functionality.
-* 🎙️ **Voice-to-App & Live Modification:** Speak your idea to build the UI/Logic in real-time, and seamlessly modify the live application purely via continuous voice commands.
-* 🌐 **Live Web Clone Engine:** Command the AI to search the live web, inspect popular website architectures, and instantly clone/copy their UI patterns into your project as per your voice prompt.
-* 💾 **Zero Stack Data Persistence (AWS DynamoDB):** Built explicitly for the "Hack the Zero Stack" philosophy. Every deployed app's state, premium tier status, and metadata are seamlessly persisted and managed in real-time using AWS DynamoDB, bypassing complex backend provisioning.
-* 🚀 **One-Click Public Launch (Powered by Vercel):** Instantly push your generated application from the local sandbox directly to a live, public URL with a single click. We leverage Vercel's edge network to give users a production-ready link in seconds.
-* 🤖 **Swarm Intelligence:** A 3-tier agentic architecture powered by OpenAI (`GPT-5.6 Manager ➔ GPT-5.6 Builder ➔ GPT-5.6 Evaluator`) working in perfect sync to eliminate hallucinations.
-* 🛡️ **Unbreakable Infrastructure:** Auto-Failover circuit breakers (`OpenAI GPT-5.6 API` ➔ `AWS Bedrock Llama 3.3` ➔ `HF Qwen`) ensure 100% uptime even during API limits.
-* 🌍 **Multilingual Intelligence (Breaking the Language Barrier):** TryNext AI supports 100+ local languages. You don't need to know English to build software; speak in your native tongue, and the AI understands the architectural intent.
-* 🧠 **Live Brain View & Voice Interaction:** It’s not a silent process. The system provides real-time "Brain View" of the Swarm logic, and once the task is completed, it speaks back to the user with a human-like persona to confirm execution and gather feedback.
+### Why this fits the challenge
 
+| OpenAI Build Week judging lens | Evidence in TryNext AI |
+| --- | --- |
+| **Technological implementation** | Multi-agent orchestration, structured intent extraction, generated single-file apps, QA scoring, self-healing retries, and provider failover. |
+| **Design** | A live sandbox, visible Manager/Coder/Evaluator status, voice input, preview, modification, and one-click deployment. |
+| **Potential impact** | Non-technical founders and local-language users can move from an idea to a testable app without learning a programming syntax first. |
+| **Quality of the idea** | The product combines voice-to-app generation with an evaluator loop and an on-demand AI Doctor that can open a GitHub repair PR. |
 
----
+## How GPT-5.6 and Codex were used
+
+**GPT-5.6 runtime:** GPT-5.6 powers the Manager, Coder, Evaluator, intent, modification, clone, and Doctor workflows through the shared `askBrain()` contract. AWS Bedrock Llama 3.3 and Hugging Face Qwen 2.5 provide request-scoped fallback routes when the primary provider is unavailable.
+
+**Codex development:** Codex helped shape the Manager -> Architect -> Coder -> Evaluator orchestration, implement the provider failover adapter, connect the API routes to the UI, and verify the repository workflow. The detailed implementation notes and file-level route map appear below.
+
+## The problem
+
+Software prototyping is still gated by syntax, setup work, and expensive iteration. A person may know exactly what they want to build but still be unable to turn that idea into a working interface.
+
+TryNext AI treats a voice note as the starting point for a software workflow. The goal is not to replace engineering judgment; it is to make the first working version, feedback loop, and deployment path accessible to more people.
 
 <div align="center">
-  <h2>🌍 The Mission: Why build for the "Next Billion Users"?</h2>
+  <h2>🌍 The Mission: Why build for the “Next Billion Users”?</h2>
 </div>
 
 > *Imagine millions of people—local shop owners, teachers, visionary students, and non-technical founders—who have brilliant ideas for an app or a website. But the moment they try to build it, they hit a massive brick wall: **coding is hard, and hiring a developer costs thousands of dollars.***
-> 
-> *Does a lack of capital, technical syntax, or **the English language barrier** mean their ideas should die? Should digital innovation only be a privilege for those who speak fluent English and can afford expensive tech agencies?*
+>
+> *Does a lack of capital, technical syntax, or **the English language barrier** mean their ideas should die? Should digital innovation only be a privilege for those who speak fluent English and can afford expensive technology agencies?*
 
 <div align="center">
-  <h3>💥 I refused to accept that. <i>I asked myself: "Can I build a bridge? Can I empower them to build their own dreams without writing a single line of code?"</i></h3>
-  <p>Coming from a non-technical commerce background myself, I know firsthand exactly how hard it is to build a digital vision without a proper developer. And that is how <b>TryNext AI</b> was born. It is not just an engineering marvel; it is a deeply personal mission and a <b>digital equalizer</b>. You don't need a massive budget or a computer science degree anymore. If you can speak your idea, the Swarm can build it. <br><br><b>🎙️ I am making software architecture as accessible as sending a voice note.</b></p>
+  <h3>💥 I refused to accept that.</h3>
+  <p><em>“Can I build a bridge? Can I empower people to build their own dreams without writing a single line of code?”</em></p>
+  <p>Coming from a non-technical commerce background, I know firsthand how difficult it can be to turn a digital vision into reality without a developer. That is why TryNext AI is more than an engineering project: it is a personal mission to make software creation a digital equalizer. If you can explain your idea, the system can help you shape, test, and launch it.</p>
+  <p><strong>🎙️ I want software architecture to feel as accessible as sending a voice note.</strong></p>
 </div>
 
----
+## What the product does
 
-## 🔥 Core Philosophy (Why TryNext AI Exists)
+- **Voice-to-app:** transcribes a request and extracts a structured software requirement.
+- **Live transcript preview:** browser interim speech results appear while recording, then Groq Whisper replaces them with the final transcript after capture.
+- **Local-language experience:** Whisper keeps the spoken language, returns the detected language, and the browser prefers a matching speech voice for completion feedback when one is installed.
+- **Manager agent:** selects CREATE, MODIFY, or CLONE and prepares the build context.
+- **Architect agent:** converts a CREATE request into a structured software requirement (SRS) for the Coder.
+- **Coder agent:** generates a complete single-file HTML application using Tailwind CSS via CDN and browser `localStorage` where state is needed.
+- **Evaluator agent:** on the CREATE path, compares the generated app against the original requirements and returns a pass/fail score with targeted feedback.
+- **Self-healing loop:** on the CREATE path, sends failed output and QA feedback back to the Coder for one repair pass before showing the result.
+- **Live modification:** accepts follow-up voice instructions against the current app.
+- **Web clone workflow:** searches a target site and uses the extracted context as input for a new UI direction.
+- **AI Doctor:** performs an on-demand whole-repository diagnostic of tracked source/configuration text files and can create a multi-file GitHub pull request when a repair is required.
+- **One-click deployment:** sends the generated app to Vercel and records deployment metadata in DynamoDB.
+- **Voice feedback and Brain View:** exposes agent progress in the UI and speaks a completion message back to the user.
 
-The traditional software development lifecycle is broken. It is gated by complex syntax, expensive engineering hours, and a steep learning curve. **We are building for the Next Billion Users.**
+## API route map
 
-For a non-technical founder with a brilliant idea, learning React, Next.js, and deployment pipelines is a massive barrier. TryNext AI shatters this barrier by using the most natural interface known to humanity: **The Human Voice.**
+The following map reflects the current files under `app/api` and the behavior a judge can verify from the repository:
 
-| Traditional AI Coding Tools ❌ | 🧠 TryNext AI ✅ |
-| :--- | :--- |
-| **Complex Backend Setup** | **Zero Stack Data Persistence (AWS DynamoDB)** |
-| **Isolated Code Snippets** | **One-Click Public Launch (Vercel Edge)** |
-| **Prompt-and-Pray** (Single generation) | **Interactive Sandbox** (Voice-modify the live app) |
-| **API Dependency & Crashes** | **Unbreakable Auto-Failover** (GPT 5.6 ➔ Llama ➔ Qwen) |
-| **Isolated Snippets** | **One-Click Public Launch** (Direct Vercel edge deployment) |
-| **Silent Code Rot** | **AI Doctor** (Continuous system-wide monitoring & Auto-PRs) |
-| **Blank Canvas Syndrome** | **Live Web Clone Engine** (Voice-commanded UI extraction) |
-| **Language & Interaction**(English Only & Silent) | **100+ Local Languages & Live Voice Feedback** |
+| Route | Responsibility | Current behavior |
+| --- | --- | --- |
+| `/api/transcribe` | Voice input | Validates the upload, sends it to multilingual Groq Whisper v3 with automatic language detection (or an optional ISO-639-1 hint), and returns transcript language/duration metadata for downstream routing. |
+| `/api/router` | Manager | Detects language, translates the success message, and chooses `CREATE`, `MODIFY`, or `CLONE`. |
+| `/api/intent` | Architect | Converts a CREATE transcript into a structured SRS: title, description, features, and UI preferences. |
+| `/api/generate` | Coder | Generates a raw single-file HTML app; accepts one previous output plus QA feedback for a repair pass. |
+| `/api/evaluate` | Evaluator | Scores CREATE output against the SRS. The current prompt evaluates the first 3,000 characters of generated HTML. |
+| `/api/modify` | Modifier | Applies a follow-up request to existing HTML and returns the modified HTML directly to the sandbox. |
+| `/api/clone` | Cloner | Resolves a site through SerpAPI when needed, fetches up to 80,000 characters of source HTML, and generates a frontend-only clone. |
+| `/api/deploy` | Deployment | Injects a 48-hour sandbox-expiry script, deploys `index.html` through the Vercel API, and best-effort writes a FREE record to DynamoDB. |
+| `/api/checkout` | Monetization | Creates a Razorpay order for ₹10 with the deployment ID in the order notes. |
+| `/api/webhook` | Payment confirmation | Verifies Razorpay's HMAC signature and upgrades the matching DynamoDB record to PRO for 30 days after `payment.captured`. |
+| `/api/doctor` | Repository diagnostics | Walks the configured base branch, scans tracked source/configuration text files, asks the model for a repository-level fatal-syntax check, and opens a repair PR only for validated, targeted `oldText` → `newText` patches. Secrets, binaries, generated directories, lockfiles, protected config files, and unsafe/ambiguous repairs are excluded. |
 
----
+The Doctor fails closed instead of silently performing a partial scan: the current safety limits are 100 scannable files, 160 KB per file, at most 5 targeted patches, 120 changed lines per PR, and 80 deleted lines per patch. If a concern cannot be expressed as a small, unique, high-confidence patch, the route returns `review` and creates no PR.
 
-## 🧬 High-Level Architecture (The Swarm & The Shield)
+## Detailed OpenAI implementation notes
 
-TryNext AI is powered by a modular, self-healing architecture that guarantees 100% uptime and zero hallucinations. It is divided into three core subsystems:
+The detailed implementation record is included for judges who want to verify how OpenAI and Codex were used.
 
-1. **The Swarm Intelligence (Agentic Loop)**
-2. **The Unbreakable Circuit Breaker (LLM Routing)**
-3. **The Zero-Stack Deployment Engine (Vercel + AWS DynamoDB) & AI Doctor**
+### GPT-5.6 in the runtime
+
+GPT-5.6 is the primary inference route behind the Manager, Coder, Evaluator, intent, modification, clone, and Doctor workflows. Each workflow uses a role-specific system instruction, while `lib/brain.ts` normalizes the response and applies the failover policy. AWS Bedrock Llama 3.3 and Hugging Face Qwen 2.5 are compatibility routes for the same request contract when the primary provider is unavailable.
+
+### Codex during development
+
+Codex was used as the engineering co-pilot to:
+
+1. shape the Manager → Architect → Coder → Evaluator orchestration;
+2. implement and document the OpenAI → Bedrock → Qwen failover adapter;
+3. connect the Next.js UI to intent, generation, evaluation, modification, clone, deploy, payment, and Doctor routes;
+4. refactor the generated-app prompt around functional local persistence and accessible UI states;
+5. review the repository, debug integration issues, and verify the final setup flow.
+
+The important implementation decisions remain visible in the repository: the agent prompts live under `app/api`, provider routing is isolated in `lib/brain.ts`, and the browser UI renders the state transitions instead of hiding them behind a single loading spinner.
+
+## Architecture
 
 <div align="center">
-  <img src="public/trynext-architecture.png" alt="TryNext AI Agentic Swarm Architecture" width="100%" />
-  <br>
-  <em>The Multi-Brain Swarm Intelligence & Self-Healing Loop</em>
+  <img src="public/trynext-architecture.png" alt="TryNext AI architecture: agents, model routing, deployment, and Doctor" width="100%" />
+  <br />
+  <em>Manager → Architect → Coder → Evaluator, backed by a three-provider inference route.</em>
 </div>
 
-<br>
+> **Diagram scope note:** The PNG is a conceptual system overview. In the current implementation, the AI Doctor is an on-demand whole-repository diagnostic route: it scans tracked source/configuration text files from GitHub, asks the model for a repository-level check, and can open a multi-file repair PR only from validated, targeted patches. Secrets, binaries, generated directories, lockfiles, protected configuration files, and unsafe/ambiguous repairs are intentionally excluded. The PNG groups the Architect/SRS step under the Manager for readability, shows Clone/Modify as part of the consolidated Coder path, and shows Razorpay-to-DynamoDB as the signed webhook update.
 
 <details>
-<summary><h3> <u>Click Here to Expand the Technical Mermaid Blueprint</u></h3></summary>
+<summary>Expand the technical blueprint</summary>
 
 ```mermaid
-graph TD
-    User[🎙️ User Voice Command] --> UI[TryNext AI UI]
+flowchart TD
+    U[Voice or text request] --> UI[TryNext AI UI]
+    UI --> T[api/transcribe]
+    T --> M[api/router · Manager]
 
-    subgraph "🤖 Swarm Intelligence & Core Engine"
-        M[Manager Agent: Planner]
-        C[Coder Agent: Builder & API Hub]
-        E[Evaluator Agent: QA]
-        
-        %% Coder's specific API Tools
-        Clone[Live Web Clone API]
-        Mod[Modify Live Logic API]
-        
-        UI -->|Analyze Intent| M
-        M -->|Action Plan| C
-        
-        %% Coder directly interacting with APIs
-        C -.->|Command: Clone Site| Clone
-        Clone -.->|Extracted UI/CSS| C
-        
-        C -.->|Command: Voice Mod| Mod
-        Mod -.->|Updated Code Block| C
-        
-        C -->|Draft Full Code| E
-        E -- "Bugs Detected ❌" --> C
-    end
+    M -->|CREATE| A[api/intent · Architect/SRS]
+    A --> C[api/generate · Coder]
+    C --> E[api/evaluate · Evaluator]
+    E -->|pass| S[Live sandbox]
+    E -->|fail| H[api/generate · one repair pass]
+    H --> S
 
-    subgraph "🧠 The Brains"
-        G{"OpenAI (GPT-5.6)"}
-        L{"AWS Bedrock (Llama 3.3)"}
-        Q{"HF (Qwen 2.5)"}
-        C -.->|Inference Request| G
-        G -- "Success" --> Output[Valid Logic]
-        G -- "Quota/Fail" --> L
-        L -- "Success" --> Output
-        L -- "Timeout/Fail" --> Q
-        Q -- "Success" --> Output
-        Output -.->|Return Payload| C
-    end
+    M -->|MODIFY| MOD[api/modify]
+    M -->|CLONE| CL[api/clone]
+    MOD --> S
+    CL --> S
 
-    E -- "Code Approved ✅" --> Sandbox[Live Sandbox Preview]
-    
-    %% Clean feedback loop
-    Sandbox -.->|🗣️ Voice Command: Update UI/Logic| UI
+    S -->|Publish| D[api/deploy]
+    D --> V[Vercel public URL]
+    D -. best effort .-> DB[(DynamoDB · FREE)]
+    S -->|Upgrade| CH[api/checkout]
+    CH --> RP[Razorpay]
+    RP -->|signed payment webhook| WH[api/webhook]
+    WH --> DBP[(DynamoDB · PRO)]
 
-    subgraph "🚀 Execution, Zero-Stack & Monetization"
-        Sandbox -->|Command: Launch| Vercel[Vercel Edge: One-Click Deploy]
-        Vercel --> Live[🌐 Live Public URL]
-        
-        %% Database & Payment Revenue Pipeline
-        Vercel -->|Saves Initial State: FREE| DB[(AWS DynamoDB)]
-        Pay{Razorpay Webhook} -.->|Micro-Transaction 10 INR: Upgrades to PRO| DB
-    end
+    M -.-> BR[lib/brain.ts · shared router]
+    A -.-> BR
+    C -.-> BR
+    E -.-> BR
+    MOD -.-> BR
+    CL -.-> BR
+    DOC -.-> BR
+    BR --> O[OpenAI GPT-5.6]
+    O -->|failure| L[AWS Bedrock Llama 3.3]
+    L -->|failure| Q[HF Qwen 2.5]
 
-    subgraph "Doctor (Monitoring System)"
-        Doctor((AI Doctor Engine))
-        GitHub[(GitHub Repository)]
-        
-        Doctor -.->|"Monitors Frontend"| UI
-        Doctor -.->|"Monitors Swarm"| C
-        Doctor -.->|"Monitors API"| G
-        Doctor -.->|"Monitors Deploy"| Vercel
-        
-        Doctor == "Identifies Issue & Pushes Fixes" ==> GitHub
-    end
-
-    %% Premium Dark Mode Styling
-    style User fill:#000,stroke:#60a5fa,stroke-width:2px,color:#fff
-    style G fill:#0f3312,stroke:#00ff41,stroke-width:2px,color:#fff
-    style L fill:#33001a,stroke:#ff0055,stroke-width:2px,color:#fff
-    style Q fill:#002b36,stroke:#00e5ff,stroke-width:2px,color:#fff
-    style Doctor fill:#4a0072,stroke:#c084fc,stroke-width:4px,color:#fff,stroke-dasharray: 5 5
-    style GitHub fill:#24292e,stroke:#fff,stroke-width:2px,color:#fff
-    style Live fill:#000,stroke:#10b981,stroke-width:2px,color:#fff
-    style DB fill:#232f3e,stroke:#ff9900,stroke-width:3px,color:#fff
-    style Pay fill:#02042b,stroke:#3395ff,stroke-width:2px,color:#fff
-    %% 🔥 The Main Highlighted Pipeline (Neon Borders)
-    style UI fill:#111827,stroke:#3b82f6,stroke-width:3px,color:#fff
-    style M fill:#111827,stroke:#eab308,stroke-width:3px,color:#fff
-    style C fill:#0f3312,stroke:#22c55e,stroke-width:4px,color:#fff
-    style E fill:#33001a,stroke:#ef4444,stroke-width:3px,color:#fff
-    style Sandbox fill:#002b36,stroke:#06b6d4,stroke-width:4px,color:#fff
-    style Vercel fill:#2a1200,stroke:#f97316,stroke-width:3px,color:#fff
+    DOC[api/doctor · on-demand] -. scans .-> REPO[GitHub repository tree]
+    DOC -->|repair when needed| PR[GitHub pull request]
 ```
 </details>
 
-### 🎛️ Inside the Architecture:
-* **The Manager Agent (Planner):** The strategic brain. It listens to the user's voice transcript, analyzes the core intent, and breaks the project down into an actionable architectural blueprint.
-* **The Coder Agent (Builder & API Hub):** The central execution engine. It doesn't just write Next.js 15 + Tailwind CSS code; it actively controls the **Live Web Clone API** to extract UI from external sites and the **Modify API** to inject voice-commanded changes into the live logic.
-* **The Evaluator Agent (QA):** The strict gatekeeper. It reviews the Coder's generated application in an isolated loop. If the UI breaks or logic fails, it forces the Coder to rewrite it *before* the user ever sees it in the Sandbox.
-* **The Circuit Breaker (Unbreakable LLM Routing):** Ensures the AI never goes down. All inference requests are routed to OpenAI first. If the request fails because of quota limits, timeouts, or service errors, the circuit breaker automatically falls back to Llama 3.3 and finally Qwen 2.5, ensuring uninterrupted service.
-* **Interactive Sandbox & Voice Mod:** The generated app runs in a live Next.js sandbox where users can continuously issue new voice commands to tweak the UI or logic in real-time.
-* **One-Click Vercel Deployment:** Once satisfied, the sandbox application is pushed directly to Vercel's Edge network, generating a live public URL in seconds. No terminal commands needed.
-* **AWS DynamoDB State Management:** App deployment details, user access links, and PRO tier upgrades are instantly verified via Webhooks and stored securely in AWS DynamoDB without spinning up dedicated backend servers.
-* **AI Doctor (Global Monitoring System):** Operates globally across the entire ecosystem. It simultaneously monitors the Frontend UI, Swarm Logic, API Health, and Deployment status. If it detects a bug or performance bottleneck, it autonomously generates and pushes a fix via a direct GitHub Pull Request (PR).
-* **Voice Feedback & Live Brain View:** Powered by a sophisticated Text-to-Speech (TTS) engine, the system acts like a personal project manager. It talks back to the user upon completion, explaining what it built, while the "Live Brain View" visualizes the real-time thought process of the Swarm agents.
+## Technical implementation notes
 
----
+### Agent loop
 
-## 📊 Enterprise-Grade Observability 
+The browser client in `app/page.tsx` coordinates the visible workflow. The Manager first decides whether the request is a build, modification, clone, or other supported action. CREATE requests pass through the Architect/intent route to produce a structured requirement (SRS), then use the Coder and Evaluator. MODIFY and CLONE requests use dedicated routes and currently return their generated HTML directly to the sandbox without a second Evaluator call. On CREATE, if the evaluation fails, the UI performs one repair pass using the previous output and QA feedback before showing the result.
 
-TryNext AI doesn't just generate code; it tracks its own footprint. I have integrated **Vercel Web Analytics** directly into the edge deployment for global observability.
+### Model routing
 
-* **Privacy-First Radar:** Monitors global traffic and live sandbox usage without compromising individual user identity (GDPR Compliant).
-* **Zero-Latency:** Runs purely on Vercel's Edge Network, ensuring the analytics script never slows down the AI's complex Swarm inference loop.
+`lib/brain.ts` exposes one `askBrain()` contract for every server route:
 
----
+1. **OpenAI GPT-5.6** — primary route when `preferredEngine` is `OPENAI`.
+2. **AWS Bedrock Llama 3.3** — fallback after an OpenAI failure, or direct route when selected.
+3. **Hugging Face Qwen 2.5** — final fallback when the preceding routes fail.
 
-## ⚙️ The Tech Stack (Engineered for Scale)
+The returned `modelUsed` and `circuitTripped` fields make the route observable to the UI and logs.
 
-I didn't just use wrappers; I built a robust, cloud-native architecture.
+### Safety and scope
 
-* **Frontend & Sandbox:** ![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=next.js&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white) ![Framer Motion](https://img.shields.io/badge/Framer_Motion-0055FF?style=for-the-badge&logo=framer&logoColor=white)
-* **The Swarm Engine:** ![OpenAI GPT-5.6](https://img.shields.io/badge/OpenAI_GPT--5.6-412991?style=for-the-badge&logo=openai&logoColor=white) ![AWS Bedrock](https://img.shields.io/badge/AWS_Bedrock_Llama_3-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white) ![Qwen](https://img.shields.io/badge/HF_Qwen-FF9D00?style=for-the-badge)
-* **Development Co-Pilot:** ![OpenAI Codex](https://img.shields.io/badge/Built_with-OpenAI_Codex-00A67E?style=for-the-badge&logo=openai&logoColor=white)
-* **Infrastructure & Database:** ![Vercel](https://img.shields.io/badge/Vercel_Edge-000000?style=for-the-badge&logo=vercel&logoColor=white) ![AWS DynamoDB](https://img.shields.io/badge/AWS_DynamoDB-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white) ![GitHub API](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
+Generated applications run in the browser sandbox and are deployed as a single HTML file. The evaluator is a quality gate, not a formal security audit; if every model is unavailable, the route has a failsafe that can bypass QA to keep the UI responsive. The AI Doctor is an on-demand whole-repository diagnostic path, not a claim of continuous autonomous production monitoring. It excludes secrets, binaries, generated directories, lockfiles, and protected configuration files by design. Doctor repairs are patch-only: a unique existing text block must be replaced by a small corrected block within the line budgets; otherwise the API returns a review-only result and creates no PR. External API availability, generated-code quality, and third-party service limits remain real-world constraints.
 
----
+## Tech stack
 
-## 🎯 Who is TryNext AI For?
+- **Application shell:** Next.js 16, React 19, TypeScript, Tailwind CSS, Framer Motion
+- **Runtime intelligence:** OpenAI GPT-5.6, AWS Bedrock Llama 3.3, Hugging Face Qwen 2.5
+- **Voice and search:** Groq transcription endpoint, SerpAPI-backed clone workflow
+- **Deployment:** Vercel Deployments API
+- **Persistence:** AWS DynamoDB
+- **Payments:** Razorpay checkout and signed webhook flow
+- **Repository automation:** GitHub API for AI Doctor pull requests
 
-1. **Non-Technical Founders:** Speak your idea, get a live Next.js MVP in seconds.
-2. **Senior Developers:** Use the *Clone API* to instantly rip UI structures from the web and bypass boilerplate setup.
-3. **The Next Billion Users:** Overcoming the English-syntax coding barrier by allowing natural language voice commands to build complex logic.
+## Try the live demo
 
----
+**Live app:** [trynext-ai.vercel.app](https://trynext-ai.vercel.app)
 
-## 🛣️ The Visionary Roadmap (What's Next?)
+For the required OpenAI Build Week submission video, use a public YouTube recording shorter than three minutes. A strong demo order is:
 
-TryNext AI is currently a frontend powerhouse with zero-stack deployment capabilities, but the ultimate vision is a **Zero-Touch Full-Stack Factory** paired with a revolutionary, privacy-first business ecosystem.
+1. say a concrete app request in a local language or English;
+2. show the CREATE path: Manager → Architect → Coder → Evaluator and the generated sandbox;
+3. issue one voice modification and show the updated result;
+4. deploy the app and show the public URL;
+5. briefly explain where GPT-5.6 ran and how Codex helped build the workflow.
 
-* 💰 **Privacy-First Monetization & Hash Renewals:** We deliberately avoided clunky traditional user accounts. TryNext AI offers free prototyping, but to unlock 'PRO Auto-Scaling' and secure continuous edge deployment, users pay a highly accessible subscription of just **₹10 per month per app**. In our upcoming release, every app will be assigned a secure, cryptographically unique **Deployment Hash**. Users will simply enter their Hash to securely renew their app's monthly validity, maintaining 100% privacy without forcing them to create accounts.
-* 🗄️ **TryNext BaaS (Backend-as-a-Service):** Empowering the end-user's data. We are building an infrastructure where the AI will autonomously provision isolated AWS DynamoDB instances for every single generated app. This will provide our users with a unified dashboard to manage their own customers' data securely, without writing a single line of backend code.
-* 📱 **Native App Compilation:** Expanding the Swarm to compile voice commands directly into production-ready iOS and Android binaries (`.apk` / `.ipa`) via React Native.
-* 🎨 **Reverse Engineering (Code-to-Figma):** Flipping the industry standard. Instead of designing first and coding later, TryNext AI will generate pixel-perfect Figma design files directly from the voice-generated live code.
+> **Submission reminder:** add the verified current-build YouTube URL to the Devpost project before submitting. The Devpost form also requires the `/feedback` Codex Session ID for the session where most of the core project was built.
 
----
+## Run locally
 
-## 🛠️ Technical Verification (For Judges)
+### Prerequisites
 
-<div align="center">
-  <br>
-  <a href="https://trynext-ai.vercel.app" target="_blank">
-    <img src="https://img.shields.io/badge/🚀_Skip_Installation_&_Try_Live_Demo-Click_Here-000000?style=for-the-badge&logo=vercel" height="35" alt="Live Demo"/>
-  </a>
-  <br><br>
-  <em>Note: Judges can test the system's full capabilities directly via the Live Edge URL above.<br>This section is strictly for open-source technical verification.</em>
-</div>
+- Node.js 20+
+- npm
+- API credentials for the features you want to exercise
 
-### 1. Clone & Install
+### Install and start
+
 ```bash
-git clone https://github.com/ranajitdharpersonal/trynext-ai.git
+git clone https://github.com/ranajitdharpersonal/trynextai.git
 cd trynext-ai
 npm install
+npm run dev
 ```
 
-### 2. The Master Keys (`.env.local`)
-To run the Multi-Brain Swarm locally, configure the following environment variables:
+Open [http://localhost:3000](http://localhost:3000).
+
+### Environment variables
+
+Create `.env.local` and add only the credentials needed for your test path. Never commit real values.
 
 ```env
-OPENAI_API_KEY=your_primary_openai_key
-GROQ_API_KEY=your_failover_key
-HF_TOKEN=your_survival_key
-SERPAPI_API_KEY=live_website_search
-GITHUB_TOKEN=for_ai_doctor_prs
-GITHUB_USERNAME=ranajitdharpersonal
-GITHUB_REPO=trynext-ai
-TRYNEXT_DEPLOY_KEY=your_secured_vercel_token
-
-# Zero Stack AWS (Database)
-AWS_REGION=ap-south-1
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_DYNAMODB_TABLE_NAME=TryNext_Deployments
-
-# AI Engine AWS Bedrock Keys
+# Primary and fallback inference
+OPENAI_API_KEY=your_openai_api_key
+HF_TOKEN=your_huggingface_token
 BEDROCK_AWS_REGION=us-east-1
 BEDROCK_AWS_ACCESS_KEY_ID=your_bedrock_access_key
 BEDROCK_AWS_SECRET_ACCESS_KEY=your_bedrock_secret_key
 
-RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
-```
-(Security Note: The Vercel deployment token is secured under a custom namespace TRYNEXT_ to bypass default cloud system restrictions and prevent environment clashes).
+# Voice transcription and web clone
+GROQ_API_KEY=your_groq_api_key
+SERPAPI_API_KEY=your_serpapi_key
 
-### 3. Ignite the Engine
-```Bash
-npm run dev
+# Vercel deployment
+TRYNEXT_DEPLOY_KEY=your_vercel_token
+
+# AWS DynamoDB persistence
+AWS_REGION=ap-south-1
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+
+# GitHub AI Doctor
+GITHUB_TOKEN=your_github_token
+GITHUB_USERNAME=your_github_username
+GITHUB_REPO=your_github_repository
+GITHUB_BASE_BRANCH=main
+
+# Razorpay checkout and webhook verification
+NEXT_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 ```
+
+If a credential is missing, the relevant feature returns an actionable error; the model layer continues through its configured fallback route where possible.
+
+## OpenAI Build Week submission checklist
+
+- [ ] Select **Work & Productivity** as the category.
+- [ ] Publish a working project description on Devpost.
+- [ ] Add the public repository URL and verify that a clean clone can start from the instructions above.
+- [ ] Add a public YouTube demo under three minutes with audio explaining GPT-5.6 and Codex usage.
+- [ ] Add the `/feedback` Codex Session ID requested by the submission form.
+- [ ] Confirm the live URL, repository behavior, and demo video all describe the same build.
+- [ ] Replace any placeholder credentials or links before submitting.
+
+## Roadmap
+
+- More robust generated-app validation and test fixtures
+- Explicit provider health metrics and retry budgets
+- Stronger sandbox isolation for generated HTML
+- Per-app data stores and a user-facing deployment dashboard
+- Native mobile compilation and code-to-design export
+
+## Author
+
+**Ranajit Dhar**
+
+AI & Multi-Agent Systems Architect — pioneering voice-to-software for local languages.
 
 ---
 
-## 👨‍💻 The Architect
-
-**Ranajit Dhar**
-* *AI & Multi-Agent Systems Architect | Pioneering Voice-to-Software for Local Languages*
-* **Copyright (c) 2026 Ranajit Dhar.**
-
-**⭐ Final Note:**
-> TryNext AI is not just a tool; it is a proof-of-concept for a future where anyone, regardless of their coding ability, can architect software using just their voice. 
-> <br><br>**Welcome to the next generation of software development.**
+TryNext AI is a proof of concept for a more inclusive software workflow: describe the outcome, inspect the generated work, improve it through feedback, and ship when it is ready.

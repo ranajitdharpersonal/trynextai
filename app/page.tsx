@@ -3,6 +3,39 @@
 import { useState, useRef, useEffect } from "react";
 import { Mic, Square, Code, Play, CheckCircle2, Loader2, Sparkles, Globe, ExternalLink, Monitor, Smartphone, LayoutTemplate, AppWindow, RefreshCw, Stethoscope, Trash2, Terminal, Activity } from "lucide-react";
 
+type LiveSpeechResult = {
+  isFinal: boolean;
+  length: number;
+  [index: number]: { transcript: string };
+};
+
+type LiveSpeechEvent = {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: LiveSpeechResult;
+  };
+};
+
+type LiveSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((event: LiveSpeechEvent) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+};
+
+type LiveSpeechRecognitionConstructor = new () => LiveSpeechRecognition;
+
+type SpeechRecognitionWindow = Window & {
+  SpeechRecognition?: LiveSpeechRecognitionConstructor;
+  webkitSpeechRecognition?: LiveSpeechRecognitionConstructor;
+};
+
 export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -54,31 +87,33 @@ export default function Home() {
   };
 
   // 👩‍💼 THE PREMIUM ENGLISH MAM (Hackathon Stable Version)
-  const speakAgent = (customText?: string) => {
+  const speakAgent = (customText?: string, languageCode = "en-US") => {
     window.speechSynthesis.cancel(); // Aager bokbok bondho
 
     // 🛑 FIX: Faltu translation bad! Strict Professional English.
     const safeText = customText || "Task completed successfully, boss.";
+    const safeLanguage = /^[a-z]{2,3}(?:-[a-z]{2,4})?$/i.test(languageCode)
+      ? languageCode
+      : "en-US";
+    const languagePrefix = safeLanguage.split('-')[0].toLowerCase();
 
     const utterance = new SpeechSynthesisUtterance(safeText);
     utterance.lang = "en-US"; // 🇺🇸 Force US English for premium accent
+    utterance.lang = safeLanguage;
     utterance.rate = 1.0;
     utterance.pitch = 1.1;
 
     const setVoiceAndSpeak = () => {
       const voices = window.speechSynthesis.getVoices();
       
-      // Find the best English female voice (Zira, Samantha, Google US)
-      const premiumVoice = voices.find(v => 
-        v.lang.startsWith('en') && 
+      // Prefer a voice matching the detected language, then fall back gracefully.
+      const matchingVoices = voices.filter(v => v.lang.toLowerCase().startsWith(languagePrefix));
+      const premiumVoice = matchingVoices.find(v =>
         (v.name.includes('Female') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Zira'))
-      );
+      ) || matchingVoices[0] || voices.find(v => v.lang.toLowerCase().startsWith('en')) || voices[0];
       
       if (premiumVoice) {
         utterance.voice = premiumVoice;
-      } else {
-        const fallback = voices.find(v => v.lang.startsWith('en'));
-        if(fallback) utterance.voice = fallback;
       }
 
       window.speechSynthesis.speak(utterance);
@@ -93,10 +128,88 @@ export default function Home() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const liveRecognitionRef = useRef<LiveSpeechRecognition | null>(null);
+  const liveFinalTextRef = useRef("");
+  const isRecordingRef = useRef(false);
+  const isStoppingRef = useRef(false);
+
+  const startLiveTranscript = () => {
+    const speechWindow = window as SpeechRecognitionWindow;
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      setDebugStatus("Listening... (live preview unavailable; final transcript will arrive after recording)");
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+
+    recognition.onresult = (event) => {
+      let interimText = "";
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const spokenText = result[0]?.transcript || "";
+
+        if (result.isFinal) {
+          liveFinalTextRef.current += `${spokenText} `;
+        } else {
+          interimText += spokenText;
+        }
+      }
+
+      const liveText = `${liveFinalTextRef.current} ${interimText}`.trim();
+      if (liveText) setTranscript(liveText);
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error !== "aborted" && event.error !== "not-allowed") {
+        addLog(`[SYSTEM] Live transcript paused; final Whisper transcription will still run.`);
+      }
+    };
+
+    recognition.onend = () => {
+      if (!isStoppingRef.current && isRecordingRef.current) {
+        try {
+          recognition.start();
+        } catch {
+          // Some browsers throw when a recognition session is restarted too quickly.
+        }
+      }
+    };
+
+    liveRecognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+    } catch {
+      setDebugStatus("Listening... (live preview unavailable; final transcript will arrive after recording)");
+    }
+  };
+
+  const stopLiveTranscript = () => {
+    isStoppingRef.current = true;
+    const recognition = liveRecognitionRef.current;
+
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch {
+        recognition.abort();
+      }
+    }
+
+    liveRecognitionRef.current = null;
+  };
 
   const startRecording = async () => {
     try {
       setTranscript("");
+      liveFinalTextRef.current = "";
+      isStoppingRef.current = false;
       // 🚨 Boro BUG FIX: Ekhane aage setGeneratedCode("") chilo, jeta purono code muse dicchilo! 
       // Ekhon theke user Trash button na tepa obdi code delete hobe na.
       setAgentStatus("");
@@ -120,6 +233,8 @@ export default function Home() {
 
       mediaRecorder.start();
       setIsRecording(true);
+      isRecordingRef.current = true;
+      startLiveTranscript();
       setDebugStatus("🎤 Listening with Perfect Ear...");
     } catch (err) {
       console.error(err);
@@ -129,6 +244,8 @@ export default function Home() {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      isRecordingRef.current = false;
+      stopLiveTranscript();
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setDebugStatus("🔄 Whisper AI transcribing...");
@@ -152,7 +269,7 @@ export default function Home() {
       setTranscript(finalText);
 
       if (finalText) {
-        generateAppFlow(finalText);
+        generateAppFlow(finalText, data.language || undefined);
       } else {
         setDebugStatus("⚠️ Kono kotha shunte paini! (Background noise ignored)");
         setAgentStatus("");
@@ -163,14 +280,15 @@ export default function Home() {
     }
   };
 
-  const generateAppFlow = async (text: string) => {
+  const generateAppFlow = async (text: string, languageHint?: string) => {
     setIsGenerating(true);
     addLog(`[WHISPER] Transcript received: "${text}"`);
     try {
       setAgentStatus("🚦 Manager Agent analyzing intent...");
       addLog(`[MANAGER] Routing request to Swarm Control...`);
       
-      const strictContext = `Target format: ${projectType.toUpperCase()}. Command: ${text}`;
+      const languageContext = languageHint ? ` Whisper detected language hint: ${languageHint}. Treat it as a hint only and preserve the user's meaning.` : "";
+      const strictContext = `Target format: ${projectType.toUpperCase()}.${languageContext} Command: ${text}`;
       
       const routerRes = await fetch('/api/router', {
         method: 'POST',
@@ -180,6 +298,10 @@ export default function Home() {
       const decision = await routerRes.json();
       
       const activeEngine = decision.source || "OPENAI"; 
+      const localizedCompletion = typeof decision.successMessage === "string" && decision.successMessage.trim()
+        ? decision.successMessage
+        : "Your project is ready! Do you want to make any modifications or publish it?";
+      const localizedLanguage = typeof decision.languageCode === "string" ? decision.languageCode : "en-US";
       
       if (decision.circuitTripped) addLog(`[SYSTEM] 🛡️ CIRCUIT BREAKER: ${decision.circuitTripped}`);
       
@@ -211,7 +333,7 @@ export default function Home() {
         addLog(`[SYSTEM] Clone operation finished 100% ✅`);
         
         // ✅ FIX: Strict English Call (No language code passed)
-        speakAgent("Your project is successfully generated and ready in the sandbox.");
+        speakAgent(localizedCompletion, localizedLanguage);
       }
       
       else if (finalAction === "MODIFY") {
@@ -234,7 +356,7 @@ export default function Home() {
         addLog(`[SYSTEM] Hot-Reloading new UI elements ✅`);
         
         // ✅ FIX: Strict English Call (No language code passed)
-        speakAgent("Your project has been successfully modified.");
+        speakAgent(localizedCompletion, localizedLanguage);
       }
       
       else { 
@@ -311,7 +433,7 @@ export default function Home() {
         addLog(`[SYSTEM] Live Sandbox updated successfully!`);
         
         // ✅ FIX: Strict English Call (No language code passed)
-        speakAgent("Your project is successfully generated and ready in the sandbox.");
+        speakAgent(localizedCompletion, localizedLanguage);
       }
 
     } catch (error: any) {
@@ -450,9 +572,16 @@ export default function Home() {
         if (data.prUrl) window.open(data.prUrl, '_blank');
 
         speakAgent("Code issue fixed. Please check the pull request on GitHub.");
+      } else if (data.status === "review") {
+        setAgentStatus(`⚠️ Manual Doctor Review Required`);
+        addLog(`[SYSTEM] ⚠️ Doctor AI: A concern was found, but no unsafe automatic patch was created.`);
+        speakAgent("The Doctor found a concern, but it needs manual review before any code is changed.");
+      } else if (data.status === "healthy") {
+        setAgentStatus(`✅ Repository scan complete`);
+        addLog(`[SYSTEM] ✅ Doctor AI: No high-confidence repair was required. No PR needed.`);
       } else {
-        setAgentStatus(`✅ Code is 100% healthy!`);
-        addLog(`[SYSTEM] ✅ Doctor AI: Code is flawlessly optimized! No PR needed.`);
+        setAgentStatus(`⚠️ Manual Doctor Review Required`);
+        addLog(`[SYSTEM] ⚠️ Doctor AI returned an unrecognized result; no code was changed.`);
       }
     } catch (error: any) {
       setAgentStatus(`❌ Doctor Failed: ${error.message}`);
@@ -679,10 +808,10 @@ export default function Home() {
                 {/* Text Block */}
                 <div className="flex flex-col items-start text-left hidden sm:flex">
                   <span className={`text-[13px] font-black tracking-widest uppercase leading-tight ${isDiagnosing ? 'text-rose-400' : 'text-gray-100 group-hover:text-white transition-colors'}`}>
-                    {isDiagnosing ? 'Auto-Healing...' : 'Run AI Doctor'}
+                    {isDiagnosing ? 'Scanning repository...' : 'Run AI Doctor'}
                   </span>
                   <span className={`text-[9px] font-bold uppercase tracking-[0.2em] mt-0.5 ${isDiagnosing ? 'text-rose-500/80' : 'text-emerald-500/80 group-hover:text-emerald-400 transition-colors'}`}>
-                    {isDiagnosing ? 'Diagnosing code' : 'Active System Monitor'}
+                    {isDiagnosing ? 'Whole-codebase review' : 'Active System Monitor'}
                   </span>
                 </div>
 
