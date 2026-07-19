@@ -384,7 +384,7 @@ export default function Home() {
   // interrupted before Vercel can return an error response.
   const requestCodeGeneration = async (payload: Record<string, unknown>): Promise<CodeGenerationResponse> => {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 85_000);
+    const timeout = window.setTimeout(() => controller.abort(), 110_000);
 
     try {
       const response = await fetch('/api/generate', {

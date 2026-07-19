@@ -57,7 +57,8 @@ const PRIMARY_PROVIDER_BY_ROLE: Record<BrainRole, BrainProvider> = {
 };
 
 const CODE_ROLES = new Set<BrainRole>(["CODER", "MODIFIER", "CLONER"]);
-const CODE_RESPONSE_TOKEN_LIMIT = 7000;
+const OPENAI_CODE_RESPONSE_TOKEN_LIMIT = 5000;
+const BEDROCK_CODE_RESPONSE_TOKEN_LIMIT = 7000;
 
 function providerTimeoutFor(provider: BrainProvider, role: BrainRole): number {
   // Repository scans legitimately need more time than a normal conversational
@@ -65,8 +66,8 @@ function providerTimeoutFor(provider: BrainProvider, role: BrainRole): number {
   if (role === "DOCTOR") return 90_000;
 
   const isCodeRequest = CODE_ROLES.has(role);
-  if (provider === "OPENAI") return isCodeRequest ? 35_000 : 25_000;
-  if (provider === "QWEN") return isCodeRequest ? 25_000 : 25_000;
+  if (provider === "OPENAI") return isCodeRequest ? 50_000 : 25_000;
+  if (provider === "QWEN") return isCodeRequest ? 40_000 : 25_000;
   if (provider === "LLAMA") return isCodeRequest ? 15_000 : 20_000;
   return 20_000;
 }
@@ -117,7 +118,7 @@ function providerChain(preferredEngine: string, role: BrainRole): BrainProvider[
 function maxTokensFor(provider: Exclude<BrainProvider, "OPENAI">, role: BrainRole): number {
   if (provider === "LLAMA") return 4000;
   if (provider === "NOVA") return 2200;
-  return CODE_ROLES.has(role) ? CODE_RESPONSE_TOKEN_LIMIT : role === "DOCTOR" ? 6000 : 3000;
+  return CODE_ROLES.has(role) ? BEDROCK_CODE_RESPONSE_TOKEN_LIMIT : role === "DOCTOR" ? 6000 : 3000;
 }
 
 async function callOpenAI(
@@ -141,10 +142,10 @@ async function callOpenAI(
           { role: "system", content: systemInstruction },
           { role: "user", content: prompt },
         ],
-        // Bound full-app responses so one request cannot monopolize the UI or
-        // consume the complete demo budget. The Coder still has room for a
-        // complete single-file application.
-        max_completion_tokens: CODE_ROLES.has(role) ? CODE_RESPONSE_TOKEN_LIMIT : 2200,
+        // GPT-5.6 is reserved for concise, complete app generation. Its cap
+        // protects the limited demo budget while Bedrock fallbacks retain a
+        // larger code budget when a primary request cannot complete.
+        max_completion_tokens: CODE_ROLES.has(role) ? OPENAI_CODE_RESPONSE_TOKEN_LIMIT : 2200,
       }),
       signal,
     }),
