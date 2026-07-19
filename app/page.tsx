@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type PointerEvent as ReactPointerEvent } from "react";
 import { Mic, Square, Code, Play, CheckCircle2, Loader2, Sparkles, Globe, ExternalLink, Monitor, Smartphone, LayoutTemplate, AppWindow, RefreshCw, Stethoscope, Trash2, Terminal, Activity } from "lucide-react";
 
 type LiveSpeechResult = {
@@ -34,6 +34,13 @@ type LiveSpeechRecognitionConstructor = new () => LiveSpeechRecognition;
 type SpeechRecognitionWindow = Window & {
   SpeechRecognition?: LiveSpeechRecognitionConstructor;
   webkitSpeechRecognition?: LiveSpeechRecognitionConstructor;
+};
+
+type CodeGenerationResponse = {
+  code: string;
+  source?: string;
+  circuitTripped?: string | null;
+  error?: string;
 };
 
 export default function Home() {
@@ -127,11 +134,48 @@ export default function Home() {
   };
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const liveRecognitionRef = useRef<LiveSpeechRecognition | null>(null);
   const liveFinalTextRef = useRef("");
   const isRecordingRef = useRef(false);
   const isStoppingRef = useRef(false);
+  const isStartingRecordingRef = useRef(false);
+  const cancelPendingRecordingRef = useRef(false);
+  const isUnmountedRef = useRef(false);
+
+  // Release browser microphone resources even if the page is refreshed or the
+  // component unmounts while a recording/session is still active.
+  useEffect(() => {
+    isUnmountedRef.current = false;
+
+    return () => {
+      isUnmountedRef.current = true;
+      isRecordingRef.current = false;
+      isStoppingRef.current = true;
+
+      try {
+        liveRecognitionRef.current?.abort();
+      } catch {
+        // Recognition may already be stopped by the browser.
+      }
+
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.onstop = null;
+        try {
+          recorder.stop();
+        } catch {
+          // The stream cleanup below is still sufficient.
+        }
+      }
+
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      liveRecognitionRef.current = null;
+    };
+  }, []);
 
   const startLiveTranscript = () => {
     const speechWindow = window as SpeechRecognitionWindow;
@@ -206,6 +250,15 @@ export default function Home() {
   };
 
   const startRecording = async () => {
+    // Pointer events can arrive twice on touch devices. The ref prevents a
+    // second getUserMedia request from replacing the active recorder.
+    if (isRecordingRef.current || isStartingRecordingRef.current || isUnmountedRef.current) {
+      return;
+    }
+
+    isStartingRecordingRef.current = true;
+    cancelPendingRecordingRef.current = false;
+
     try {
       setTranscript("");
       liveFinalTextRef.current = "";
@@ -217,6 +270,17 @@ export default function Home() {
       setBrainLogs([]); // Sudhu logs ar transcript clear korbo notun command-er jonno
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+
+      // If the user released the button while the browser permission prompt
+      // was open, immediately release the newly granted stream instead of
+      // leaving an invisible recorder running.
+      if (cancelPendingRecordingRef.current || isUnmountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        return;
+      }
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -228,27 +292,124 @@ export default function Home() {
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach(track => track.stop());
-        await processAudio(audioBlob);
+        if (recordingStreamRef.current === stream) recordingStreamRef.current = null;
+        if (mediaRecorderRef.current === mediaRecorder) mediaRecorderRef.current = null;
+        isRecordingRef.current = false;
+
+        if (isUnmountedRef.current) return;
+
+        setIsRecording(false);
+        if (audioBlob.size > 0) {
+          await processAudio(audioBlob);
+        } else {
+          setDebugStatus("No audio captured. Hold the mic button and try again.");
+          setAgentStatus("");
+        }
       };
 
       mediaRecorder.start();
-      setIsRecording(true);
       isRecordingRef.current = true;
+      setIsRecording(true);
       startLiveTranscript();
       setDebugStatus("🎤 Listening with Perfect Ear...");
     } catch (err) {
       console.error(err);
-      setDebugStatus("❌ Mic permission denied!");
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      isRecordingRef.current = false;
+
+      if (!isUnmountedRef.current) {
+        setIsRecording(false);
+        const errorName = err instanceof DOMException ? err.name : "";
+        setDebugStatus(
+          errorName === "NotAllowedError"
+            ? "❌ Microphone permission is blocked. Allow it in this site's browser settings."
+            : "❌ Microphone is unavailable. Check the device and try again.",
+        );
+      }
+    } finally {
+      isStartingRecordingRef.current = false;
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      isRecordingRef.current = false;
-      stopLiveTranscript();
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setDebugStatus("🔄 Whisper AI transcribing...");
+    // A quick release while the permission dialog is open used to be ignored
+    // because React state had not yet changed to `isRecording`.
+    if (isStartingRecordingRef.current && !isRecordingRef.current) {
+      cancelPendingRecordingRef.current = true;
+      return;
+    }
+
+    if (!isRecordingRef.current) return;
+
+    isRecordingRef.current = false;
+    stopLiveTranscript();
+    setIsRecording(false);
+    setDebugStatus("🔄 Whisper AI transcribing...");
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+        return;
+      } catch {
+        // Fall through and release the stream below.
+      }
+    }
+
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingStreamRef.current = null;
+    mediaRecorderRef.current = null;
+  };
+
+  const handleRecordPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    event.preventDefault();
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is optional; recording still works where unsupported.
+    }
+    void startRecording();
+  };
+
+  const handleRecordPointerStop = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    stopRecording();
+  };
+
+  // Keep the interactive UI recoverable even if a serverless connection is
+  // interrupted before Vercel can return an error response.
+  const requestCodeGeneration = async (payload: Record<string, unknown>): Promise<CodeGenerationResponse> => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 85_000);
+
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      const data = (await response.json()) as Partial<CodeGenerationResponse>;
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || `Coder request failed (${response.status})`);
+      }
+      if (typeof data.code !== 'string' || !data.code.trim()) {
+        throw new Error('Coder returned no usable application code.');
+      }
+
+      return data as CodeGenerationResponse;
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new Error('Coder took too long, so the request was stopped. Please try again.');
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
     }
   };
 
@@ -380,13 +541,11 @@ export default function Home() {
         addLog(`[CODER] Compiling Tailwind CSS & Glassmorphism UI...`);
         addLog(`[DATA WIZARD] Injecting LocalStorage Vanilla JS...`);
         
-        const coderRes = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ srs: intentData.srs, activeEngine: activeEngine }) 
+        const coderData = await requestCodeGeneration({
+          srs: intentData.srs,
+          activeEngine: activeEngine,
         });
-        const coderData = await coderRes.json();
-        if (coderData.error) throw new Error(coderData.error);
+        if (coderData.circuitTripped) addLog(`[SYSTEM] 🛡️ CIRCUIT BREAKER: ${coderData.circuitTripped}`);
 
         let currentCode = coderData.code;
 
@@ -408,18 +567,13 @@ export default function Home() {
           setAgentStatus(`🛠️ Coder fixing bugs based on QA feedback...`);
           addLog(`[CODER] Executing Self-Healing loop...`);
           
-          const healRes = await fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              srs: intentData.srs, 
-              previousCode: currentCode, 
-              qaFeedback: qaData.evaluation.feedback,
-              activeEngine: activeEngine 
-            })
+          const healData = await requestCodeGeneration({
+            srs: intentData.srs,
+            previousCode: currentCode,
+            qaFeedback: qaData.evaluation.feedback,
+            activeEngine: activeEngine,
           });
-          const healData = await healRes.json();
-          if (healData.error) throw new Error(healData.error);
+          if (healData.circuitTripped) addLog(`[SYSTEM] 🛡️ CIRCUIT BREAKER: ${healData.circuitTripped}`);
           
           currentCode = healData.code; 
           setIsHealing(false);
@@ -640,9 +794,12 @@ export default function Home() {
             {isRecording && <div className="absolute inset-0 bg-rose-500/20 rounded-full blur-3xl animate-pulse scale-150"></div>}
             <div className="absolute inset-0 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500 -z-10"></div>
             <button
-              onMouseDown={startRecording} onMouseUp={stopRecording} onTouchStart={startRecording} onTouchEnd={stopRecording}
+              onPointerDown={handleRecordPointerDown}
+              onPointerUp={handleRecordPointerStop}
+              onPointerCancel={handleRecordPointerStop}
+              onLostPointerCapture={handleRecordPointerStop}
               disabled={isGenerating || isDeploying || isDiagnosing}
-              className={`select-none relative z-10 flex items-center justify-center w-36 h-36 rounded-full transition-all duration-500 ${isGenerating || isDeploying || isDiagnosing ? 'bg-black/60 cursor-not-allowed border border-white/5' :
+              className={`touch-none select-none relative z-10 flex items-center justify-center w-36 h-36 rounded-full transition-all duration-500 ${isGenerating || isDeploying || isDiagnosing ? 'bg-black/60 cursor-not-allowed border border-white/5' :
                   isRecording ? "bg-gradient-to-br from-rose-500 to-red-600 scale-105 shadow-[0_0_50px_rgba(225,29,72,0.5)] border-0" : "bg-gradient-to-br from-indigo-600 to-purple-700 hover:scale-105 hover:shadow-[0_0_50px_rgba(124,58,237,0.5)] border border-white/10"
                 }`}
             >

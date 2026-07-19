@@ -57,6 +57,40 @@ const PRIMARY_PROVIDER_BY_ROLE: Record<BrainRole, BrainProvider> = {
 };
 
 const CODE_ROLES = new Set<BrainRole>(["CODER", "MODIFIER", "CLONER"]);
+const CODE_RESPONSE_TOKEN_LIMIT = 7000;
+
+function providerTimeoutFor(provider: BrainProvider, role: BrainRole): number {
+  // Repository scans legitimately need more time than a normal conversational
+  // request, while interactive app generation must stay bounded for the UI.
+  if (role === "DOCTOR") return 90_000;
+
+  const isCodeRequest = CODE_ROLES.has(role);
+  if (provider === "OPENAI") return isCodeRequest ? 35_000 : 25_000;
+  if (provider === "QWEN") return isCodeRequest ? 25_000 : 25_000;
+  if (provider === "LLAMA") return isCodeRequest ? 15_000 : 20_000;
+  return 20_000;
+}
+
+async function withProviderTimeout<T>(
+  provider: BrainProvider,
+  role: BrainRole,
+  request: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const timeoutMs = providerTimeoutFor(provider, role);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await request(controller.signal);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`${MODEL_LABELS[provider]} timed out after ${timeoutMs / 1000} seconds`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown provider error";
@@ -83,7 +117,7 @@ function providerChain(preferredEngine: string, role: BrainRole): BrainProvider[
 function maxTokensFor(provider: Exclude<BrainProvider, "OPENAI">, role: BrainRole): number {
   if (provider === "LLAMA") return 4000;
   if (provider === "NOVA") return 2200;
-  return CODE_ROLES.has(role) ? 12000 : role === "DOCTOR" ? 6000 : 3000;
+  return CODE_ROLES.has(role) ? CODE_RESPONSE_TOKEN_LIMIT : role === "DOCTOR" ? 6000 : 3000;
 }
 
 async function callOpenAI(
@@ -94,22 +128,27 @@ async function callOpenAI(
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error("OPENAI_API_KEY missing");
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openaiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-5.6",
-      messages: [
-        { role: "system", content: systemInstruction },
-        { role: "user", content: prompt },
-      ],
-      // Keep non-coding calls small while allowing generated HTML to finish.
-      max_completion_tokens: CODE_ROLES.has(role) ? 12000 : 2200,
+  const response = await withProviderTimeout("OPENAI", role, (signal) =>
+    fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-5.6",
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: prompt },
+        ],
+        // Bound full-app responses so one request cannot monopolize the UI or
+        // consume the complete demo budget. The Coder still has room for a
+        // complete single-file application.
+        max_completion_tokens: CODE_ROLES.has(role) ? CODE_RESPONSE_TOKEN_LIMIT : 2200,
+      }),
+      signal,
     }),
-  });
+  );
 
   const data = await response.json();
   if (!response.ok) throw new Error(data.error?.message || "OpenAI request failed");
@@ -154,7 +193,9 @@ async function callBedrock(
     },
   });
 
-  const response = await client.send(command);
+  const response = await withProviderTimeout(provider, role, (abortSignal) =>
+    client.send(command, { abortSignal }),
+  );
   const content = response.output?.message?.content || [];
   const text = content
     .map((block) => ("text" in block && typeof block.text === "string" ? block.text : ""))
