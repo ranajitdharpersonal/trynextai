@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     const prompt = `User Command: "${transcript}"\nDoes the user currently have a project open in the editor? ${hasExistingCode}`;
 
     // 🧠 BRAIN ENGINE CALL
-    const response = await askBrain(prompt, SYSTEM_PROMPT);
+    const response = await askBrain(prompt, SYSTEM_PROMPT, "OPENAI", "ROUTER");
     
     // JSON parse korar aage Markdown clean korchi (Jodi Qwen ba Llama boka-r moto ```json bosiye dey)
     let cleanText = response.text.replace(/```json/gi, '').replace(/```/g, '').trim();

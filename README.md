@@ -27,10 +27,13 @@ Voice request → Manager (route)
 
 CREATE failure → one repair pass before the result is shown
 
-Inference route: OpenAI GPT-5.6 → AWS Bedrock Llama 3.3 → Hugging Face Qwen 2.5
+Primary tier (role-aware): Nova 2 Lite for routing/planning → GPT-5.6 for code generation → Qwen3 Coder Next for QA/Doctor
+Failover tier: the failed request advances to Qwen3 Coder Next → AWS Bedrock Llama 3.3
 ```
 
-The primary GPT-5.6 route is used when available. The fallback chain is request-scoped: a provider failure is recorded and the same request continues through the next provider. This keeps the user-facing workflow resilient without claiming that any external API can provide literal 100% uptime.
+The primary tier is role-aware to control cost without making GPT-5.6 incidental: Nova 2 Lite handles lightweight routing and planning, GPT-5.6 handles code-producing work, and Qwen3 Coder Next handles evaluation and repository repair. A provider failure is recorded and the same request advances through the next available provider, ending at Llama 3.3 when both earlier tiers fail.
+
+**Honest model positioning:** TryNext AI is GPT-5.6-powered for its core code-generation workflow; it is not a claim that GPT-5.6 is the cheapest or first model for every agent. Each role uses the strongest cost-appropriate primary brain, with the same failover protection across the system.
 
 ### Why this fits the challenge
 
@@ -43,9 +46,9 @@ The primary GPT-5.6 route is used when available. The fallback chain is request-
 
 ## How GPT-5.6 and Codex were used
 
-**GPT-5.6 runtime:** GPT-5.6 powers the Manager, Coder, Evaluator, intent, modification, clone, and Doctor workflows through the shared `askBrain()` contract. AWS Bedrock Llama 3.3 and Hugging Face Qwen 2.5 provide request-scoped fallback routes when the primary provider is unavailable.
+**GPT-5.6 runtime:** GPT-5.6 is the primary model for the Coder, Modifier, and Cloner workflows. Nova 2 Lite handles routing and requirement planning, while Qwen3 Coder Next handles QA and repository Doctor tasks. Any failed primary request falls through to Qwen3 Coder Next and then AWS Bedrock Llama 3.3.
 
-**Codex development:** Codex helped shape the Manager -> Architect -> Coder -> Evaluator orchestration, implement the provider failover adapter, connect the API routes to the UI, and verify the repository workflow. The detailed implementation notes and file-level route map appear below.
+**Codex development:** Codex helped shape the Manager -> Architect -> Coder -> Evaluator orchestration, implement the role-aware provider failover adapter, connect the API routes to the UI, and verify the repository workflow. The detailed implementation notes and file-level route map appear below.
 
 ## The problem
 
@@ -108,16 +111,22 @@ The Doctor fails closed instead of silently performing a partial scan: the curre
 
 The detailed implementation record is included for judges who want to verify how OpenAI and Codex were used.
 
-### GPT-5.6 in the runtime
+### Role-aware model routing
 
-GPT-5.6 is the primary inference route behind the Manager, Coder, Evaluator, intent, modification, clone, and Doctor workflows. Each workflow uses a role-specific system instruction, while `lib/brain.ts` normalizes the response and applies the failover policy. AWS Bedrock Llama 3.3 and Hugging Face Qwen 2.5 are compatibility routes for the same request contract when the primary provider is unavailable.
+`lib/brain.ts` keeps one `askBrain()` contract while assigning the least expensive suitable primary model to each role:
+
+- **Router / Intent / Manager:** Amazon Nova 2 Lite.
+- **Coder / Modifier / Cloner:** OpenAI GPT-5.6.
+- **Evaluator / AI Doctor:** Qwen3 Coder Next.
+
+If the selected primary provider fails, the same request advances to Qwen3 Coder Next and then AWS Bedrock Llama 3.3. The Bedrock adapter uses the model-agnostic Converse API so Nova, Qwen, and Llama share one normalized response path.
 
 ### Codex during development
 
 Codex was used as the engineering co-pilot to:
 
 1. shape the Manager → Architect → Coder → Evaluator orchestration;
-2. implement and document the OpenAI → Bedrock → Qwen failover adapter;
+2. implement and document the role-aware Nova → GPT-5.6 → Qwen primary tier and Qwen → Llama failover adapter;
 3. connect the Next.js UI to intent, generation, evaluation, modification, clone, deploy, payment, and Doctor routes;
 4. refactor the generated-app prompt around functional local persistence and accessible UI states;
 5. review the repository, debug integration issues, and verify the final setup flow.
@@ -129,7 +138,7 @@ The important implementation decisions remain visible in the repository: the age
 <div align="center">
   <img src="public/trynext-architecture.png" alt="TryNext AI architecture: agents, model routing, deployment, and Doctor" width="100%" />
   <br />
-  <em>Manager → Architect → Coder → Evaluator, backed by a three-provider inference route.</em>
+  <em>Manager → Architect → Coder → Evaluator, backed by role-aware routing and three-provider failover.</em>
 </div>
 
 > **Diagram scope note:** The PNG is a conceptual system overview. In the current implementation, the AI Doctor is an on-demand whole-repository diagnostic route: it scans tracked source/configuration text files from GitHub, asks the model for a repository-level check, and can open a multi-file repair PR only from validated, targeted patches. Secrets, binaries, generated directories, lockfiles, protected configuration files, and unsafe/ambiguous repairs are intentionally excluded. The PNG groups the Architect/SRS step under the Manager for readability, shows Clone/Modify as part of the consolidated Coder path, and shows Razorpay-to-DynamoDB as the signed webhook update.
@@ -170,9 +179,12 @@ flowchart TD
     MOD -.-> BR
     CL -.-> BR
     DOC -.-> BR
-    BR --> O[OpenAI GPT-5.6]
-    O -->|failure| L[AWS Bedrock Llama 3.3]
-    L -->|failure| Q[HF Qwen 2.5]
+    BR -->|Router / Intent / Manager| N[Nova 2 Lite]
+    BR -->|Coder / Modify / Clone| O[OpenAI GPT-5.6]
+    BR -->|Evaluator / Doctor| Q[Qwen3 Coder Next]
+    N -->|failure| Q
+    O -->|failure| Q
+    Q -->|failure| L[AWS Bedrock Llama 3.3]
 
     DOC[api/doctor · on-demand] -. scans .-> REPO[GitHub repository tree]
     DOC -->|repair when needed| PR[GitHub pull request]
@@ -187,13 +199,13 @@ The browser client in `app/page.tsx` coordinates the visible workflow. The Manag
 
 ### Model routing
 
-`lib/brain.ts` exposes one `askBrain()` contract for every server route:
+`lib/brain.ts` exposes one `askBrain()` contract for every server route and receives the role being executed:
 
-1. **OpenAI GPT-5.6** — primary route when `preferredEngine` is `OPENAI`.
-2. **AWS Bedrock Llama 3.3** — fallback after an OpenAI failure, or direct route when selected.
-3. **Hugging Face Qwen 2.5** — final fallback when the preceding routes fail.
+1. **Role-aware primary tier:** Nova 2 Lite for Router/Intent/Manager, GPT-5.6 for Coder/Modifier/Cloner, and Qwen3 Coder Next for Evaluator/Doctor.
+2. **Secondary brain:** Qwen3 Coder Next handles any request whose primary provider fails.
+3. **Survival brain:** AWS Bedrock Llama 3.3 handles requests after the earlier providers fail.
 
-The returned `modelUsed` and `circuitTripped` fields make the route observable to the UI and logs.
+The `askBrain()` contract returns `modelUsed`, `modelName`, and `circuitTripped`, making the selected provider and failover path observable to server logs and any route that exposes those fields.
 
 ### Safety and scope
 
@@ -202,7 +214,7 @@ Generated applications run in the browser sandbox and are deployed as a single H
 ## Tech stack
 
 - **Application shell:** Next.js 16, React 19, TypeScript, Tailwind CSS, Framer Motion
-- **Runtime intelligence:** OpenAI GPT-5.6, AWS Bedrock Llama 3.3, Hugging Face Qwen 2.5
+- **Runtime intelligence:** OpenAI GPT-5.6, Amazon Nova 2 Lite, AWS Bedrock Qwen3 Coder Next, AWS Bedrock Llama 3.3
 - **Voice and search:** Groq transcription endpoint, SerpAPI-backed clone workflow
 - **Deployment:** Vercel Deployments API
 - **Persistence:** AWS DynamoDB
@@ -249,7 +261,6 @@ Create `.env.local` and add only the credentials needed for your test path. Neve
 ```env
 # Primary and fallback inference
 OPENAI_API_KEY=your_openai_api_key
-HF_TOKEN=your_huggingface_token
 BEDROCK_AWS_REGION=us-east-1
 BEDROCK_AWS_ACCESS_KEY_ID=your_bedrock_access_key
 BEDROCK_AWS_SECRET_ACCESS_KEY=your_bedrock_secret_key

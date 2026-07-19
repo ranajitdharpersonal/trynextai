@@ -232,6 +232,8 @@ Safety rules:
   const response = await askBrain(
     `Repository: ${owner}/${repo}\nBase branch: ${baseBranch}\nScannable files: ${scannedFiles.length}\n${snapshot}`,
     systemPrompt,
+    "OPENAI",
+    "DOCTOR",
   );
 
   const report = JSON.parse(cleanJson(response.text)) as DoctorReport;

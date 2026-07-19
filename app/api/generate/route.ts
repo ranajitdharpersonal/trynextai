@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
     // 🧠 MULTI-BRAIN ROUTING (Handled by brain.ts)
     try {
-      const response = await askBrain(prompt, SYSTEM_PROMPT);
+      const response = await askBrain(prompt, SYSTEM_PROMPT, "OPENAI", "CODER");
       
       let htmlCode = response.text.replace(/```html/gi, '').replace(/```/g, '').trim();
       

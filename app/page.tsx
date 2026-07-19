@@ -711,7 +711,7 @@ export default function Home() {
                         <span className="text-[18px] opacity-90 drop-shadow-md">🎛️</span>
                         <div className="flex flex-col">
                           <span className="font-bold text-gray-200 text-[11px] tracking-wide">Manager Agent</span>
-                          <span className="text-[9px] text-gray-500 uppercase tracking-widest mt-0.5">Role: Routing & Intent</span>
+                          <span className="text-[9px] text-gray-500 uppercase tracking-widest mt-0.5">Nova 2 Lite · Routing & Intent</span>
                         </div>
                       </div>
                       
@@ -720,7 +720,7 @@ export default function Home() {
                         <span className="text-[18px] opacity-90 drop-shadow-md">🔨</span>
                         <div className="flex flex-col">
                           <span className="font-bold text-gray-200 text-[11px] tracking-wide">Coder Agent</span>
-                          <span className="text-[9px] text-gray-500 uppercase tracking-widest mt-0.5">Role: UI/UX & Logic</span>
+                          <span className="text-[9px] text-gray-500 uppercase tracking-widest mt-0.5">GPT-5.6 · UI/UX & Logic</span>
                         </div>
                       </div>
                       
@@ -729,7 +729,7 @@ export default function Home() {
                         <span className="text-[18px] opacity-90 drop-shadow-md">⚖️</span>
                         <div className="flex flex-col">
                           <span className="font-bold text-emerald-400 text-[11px] tracking-wide">Evaluator Agent</span>
-                          <span className="text-[9px] text-emerald-500/60 uppercase tracking-widest mt-0.5">Role: QA & Auto-Healing</span>
+                          <span className="text-[9px] text-emerald-500/60 uppercase tracking-widest mt-0.5">Qwen3 Coder Next · QA & Auto-Healing</span>
                         </div>
                       </div>
                     </div>

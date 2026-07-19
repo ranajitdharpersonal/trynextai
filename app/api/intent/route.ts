@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const prompt = `User Intent: "${transcript}"\nReturn ONLY JSON.`;
 
     // 🧠 MULTI-BRAIN ROUTING (Handled by brain.ts)
-    const response = await askBrain(prompt, SYSTEM_PROMPT);
+    const response = await askBrain(prompt, SYSTEM_PROMPT, "OPENAI", "MANAGER");
     
     // Clean JSON formatting
     let rawText = response.text.replace(/```json/gi, '').replace(/```/g, '').trim();

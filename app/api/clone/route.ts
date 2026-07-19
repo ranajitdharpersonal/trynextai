@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     
     // 🧠 MULTI-BRAIN ROUTING (Ebar Thief agent o kokhono fail korbe na!)
     try {
-      const response = await askBrain(clonePrompt, SYSTEM_PROMPT);
+      const response = await askBrain(clonePrompt, SYSTEM_PROMPT, "OPENAI", "CLONER");
       
       let htmlCode = response.text.replace(/```html/gi, '').replace(/```/g, '').trim();
       
