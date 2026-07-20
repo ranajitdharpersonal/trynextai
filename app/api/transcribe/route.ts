@@ -20,7 +20,17 @@ type GroqTranscription = {
   text?: unknown;
   language?: unknown;
   duration?: unknown;
+  segments?: unknown;
 };
+
+type GroqSegment = {
+  text?: unknown;
+  avg_logprob?: unknown;
+  no_speech_prob?: unknown;
+};
+
+const HIGH_NO_SPEECH_PROBABILITY = 0.85;
+const VERY_LOW_CONFIDENCE = -1.5;
 
 function getExtension(fileName: string): string {
   const match = fileName.toLowerCase().match(/\.[a-z0-9]+$/);
@@ -29,11 +39,37 @@ function getExtension(fileName: string): string {
 
 function extensionForMimeType(mimeType: string): string {
   if (mimeType === 'audio/mpeg') return '.mp3';
-  if (mimeType === 'audio/mp4' || mimeType === 'audio/m4a') return '.m4a';
+  if (mimeType === 'audio/mp4') return '.mp4';
+  if (mimeType === 'audio/m4a') return '.m4a';
   if (mimeType === 'audio/ogg') return '.ogg';
   if (mimeType === 'audio/wav' || mimeType === 'audio/x-wav') return '.wav';
   if (mimeType === 'audio/flac') return '.flac';
   return '.webm';
+}
+
+function containsLikelySpeech(data: GroqTranscription): boolean {
+  if (!Array.isArray(data.segments) || data.segments.length === 0) {
+    // Keep compatibility with providers that omit segment metadata rather than
+    // rejecting a valid multilingual command solely because it is unavailable.
+    return true;
+  }
+
+  const segments = data.segments as GroqSegment[];
+  const textSegments = segments.filter((segment) => (
+    typeof segment.text === 'string' && segment.text.trim().length > 0
+  ));
+
+  if (textSegments.length === 0) return false;
+
+  // Reject only when every returned segment is strongly classified as
+  // non-speech and very low confidence. This deliberately conservative rule
+  // avoids discarding quiet speakers, accents, or local languages.
+  return !textSegments.every((segment) => (
+    typeof segment.no_speech_prob === 'number'
+    && segment.no_speech_prob >= HIGH_NO_SPEECH_PROBABILITY
+    && typeof segment.avg_logprob === 'number'
+    && segment.avg_logprob <= VERY_LOW_CONFIDENCE
+  ));
 }
 
 function normalizeLanguageHint(value: FormDataEntryValue | null): string | null {
@@ -86,9 +122,15 @@ export async function POST(req: Request) {
     const originalName = 'name' in audioEntry && typeof (audioEntry as File).name === 'string'
       ? (audioEntry as File).name
       : '';
-    const extension = getExtension(originalName) || extensionForMimeType(mimeType);
+    const declaredExtension = getExtension(originalName);
+    const hasSupportedMimeType = ALLOWED_MIME_TYPES.has(mimeType);
+    // The browser-provided MIME type is more trustworthy than a fixed file
+    // name. This keeps Safari MP4 recordings from being re-uploaded as WebM.
+    const extension = hasSupportedMimeType
+      ? extensionForMimeType(mimeType)
+      : declaredExtension || extensionForMimeType(mimeType);
 
-    if (!ALLOWED_MIME_TYPES.has(mimeType) && !ALLOWED_EXTENSIONS.has(extension)) {
+    if (!hasSupportedMimeType && !ALLOWED_EXTENSIONS.has(extension)) {
       return NextResponse.json({ error: 'Unsupported audio format. Please use WebM, WAV, MP3, M4A, OGG, or FLAC.' }, { status: 415 });
     }
 
@@ -98,12 +140,11 @@ export async function POST(req: Request) {
     groqData.append('model', 'whisper-large-v3');
     groqData.append('temperature', '0');
     groqData.append('response_format', 'verbose_json');
-    groqData.append(
-      'prompt',
-      'TryNext AI. App, website, UI, dashboard, create, modify, clone. Preserve the speaker\'s language and wording exactly.',
-    );
+    groqData.append('timestamp_granularities[]', 'segment');
 
-    // Auto-detection remains the default. A trusted ISO-639-1 hint improves accuracy when the client knows it.
+    // Auto-detection remains the default. A trusted explicit ISO-639-1 hint
+    // improves accuracy, but the browser locale is not sent blindly because a
+    // multilingual speaker may be using a device configured in another language.
     if (languageHint) groqData.append('language', languageHint);
 
     const controller = new AbortController();
@@ -127,6 +168,12 @@ export async function POST(req: Request) {
 
     if (!text) {
       return NextResponse.json({ error: 'No speech was detected in the audio.' }, { status: 422 });
+    }
+
+    if (!containsLikelySpeech(data)) {
+      return NextResponse.json({
+        error: 'I could not hear that clearly. Please hold the mic and speak a little closer, away from background noise.',
+      }, { status: 422 });
     }
 
     return NextResponse.json({

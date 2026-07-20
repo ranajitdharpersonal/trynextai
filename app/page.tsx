@@ -43,8 +43,34 @@ type CodeGenerationResponse = {
   error?: string;
 };
 
+const RECORDING_MIME_TYPES = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/ogg;codecs=opus',
+  'audio/ogg',
+  'audio/mp4',
+] as const;
+
+function preferredRecordingMimeType(): string | undefined {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return undefined;
+  }
+
+  return RECORDING_MIME_TYPES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+}
+
+function extensionForAudioMimeType(mimeType: string): string {
+  const normalizedMimeType = mimeType.toLowerCase().split(';')[0];
+  if (normalizedMimeType === 'audio/mp4') return '.mp4';
+  if (normalizedMimeType === 'audio/m4a') return '.m4a';
+  if (normalizedMimeType === 'audio/ogg') return '.ogg';
+  if (normalizedMimeType === 'audio/wav' || normalizedMimeType === 'audio/x-wav') return '.wav';
+  return '.webm';
+}
+
 export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [debugStatus, setDebugStatus] = useState("System Ready");
 
@@ -135,14 +161,18 @@ export default function Home() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const liveRecognitionRef = useRef<LiveSpeechRecognition | null>(null);
   const liveFinalTextRef = useRef("");
   const isRecordingRef = useRef(false);
+  const isTranscribingRef = useRef(false);
   const isStoppingRef = useRef(false);
   const isStartingRecordingRef = useRef(false);
   const cancelPendingRecordingRef = useRef(false);
   const isUnmountedRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
+  const voiceSessionRef = useRef(0);
+  const transcriptionAbortRef = useRef<AbortController | null>(null);
+  const stopRecordingHandlerRef = useRef<(pointerId?: number) => void>(() => {});
 
   // Release browser microphone resources even if the page is refreshed or the
   // component unmounts while a recording/session is still active.
@@ -151,8 +181,14 @@ export default function Home() {
 
     return () => {
       isUnmountedRef.current = true;
+      voiceSessionRef.current += 1;
       isRecordingRef.current = false;
+      isTranscribingRef.current = false;
       isStoppingRef.current = true;
+      activePointerIdRef.current = null;
+
+      transcriptionAbortRef.current?.abort();
+      transcriptionAbortRef.current = null;
 
       try {
         liveRecognitionRef.current?.abort();
@@ -177,7 +213,7 @@ export default function Home() {
     };
   }, []);
 
-  const startLiveTranscript = () => {
+  const startLiveTranscript = (sessionId: number) => {
     const speechWindow = window as SpeechRecognitionWindow;
     const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
 
@@ -186,12 +222,29 @@ export default function Home() {
       return;
     }
 
+    try {
+      liveRecognitionRef.current?.abort();
+    } catch {
+      // A previous browser recognition session may already be closed.
+    }
+    liveRecognitionRef.current = null;
+
     const recognition = new Recognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
 
+    const isCurrentRecognition = () => (
+      !isUnmountedRef.current
+      && voiceSessionRef.current === sessionId
+      && liveRecognitionRef.current === recognition
+      && isRecordingRef.current
+      && !isStoppingRef.current
+    );
+
     recognition.onresult = (event) => {
+      if (!isCurrentRecognition()) return;
+
       let interimText = "";
 
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
@@ -210,13 +263,15 @@ export default function Home() {
     };
 
     recognition.onerror = (event) => {
+      if (!isCurrentRecognition()) return;
+
       if (event.error !== "aborted" && event.error !== "not-allowed") {
         addLog(`[SYSTEM] Live transcript paused; final Whisper transcription will still run.`);
       }
     };
 
     recognition.onend = () => {
-      if (!isStoppingRef.current && isRecordingRef.current) {
+      if (isCurrentRecognition()) {
         try {
           recognition.start();
         } catch {
@@ -230,6 +285,9 @@ export default function Home() {
     try {
       recognition.start();
     } catch {
+      if (liveRecognitionRef.current === recognition) {
+        liveRecognitionRef.current = null;
+      }
       setDebugStatus("Listening... (live preview unavailable; final transcript will arrive after recording)");
     }
   };
@@ -237,6 +295,7 @@ export default function Home() {
   const stopLiveTranscript = () => {
     isStoppingRef.current = true;
     const recognition = liveRecognitionRef.current;
+    liveRecognitionRef.current = null;
 
     if (recognition) {
       try {
@@ -246,16 +305,22 @@ export default function Home() {
       }
     }
 
-    liveRecognitionRef.current = null;
   };
 
   const startRecording = async () => {
-    // Pointer events can arrive twice on touch devices. The ref prevents a
-    // second getUserMedia request from replacing the active recorder.
-    if (isRecordingRef.current || isStartingRecordingRef.current || isUnmountedRef.current) {
+    // Voice capture is single-flight. A new hold cannot overwrite an audio
+    // buffer or a transcription that is still being finalized.
+    if (
+      isRecordingRef.current
+      || isStartingRecordingRef.current
+      || isTranscribingRef.current
+      || isUnmountedRef.current
+    ) {
       return;
     }
 
+    const sessionId = voiceSessionRef.current + 1;
+    voiceSessionRef.current = sessionId;
     isStartingRecordingRef.current = true;
     cancelPendingRecordingRef.current = false;
 
@@ -269,48 +334,89 @@ export default function Home() {
       setIsHealing(false);
       setBrainLogs([]); // Sudhu logs ar transcript clear korbo notun command-er jonno
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        throw new Error('Voice recording is not supported by this browser.');
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: { ideal: true },
+          noiseSuppression: { ideal: true },
+          autoGainControl: { ideal: true },
+          channelCount: { ideal: 1 },
+        },
+      });
       recordingStreamRef.current = stream;
 
       // If the user released the button while the browser permission prompt
       // was open, immediately release the newly granted stream instead of
       // leaving an invisible recorder running.
-      if (cancelPendingRecordingRef.current || isUnmountedRef.current) {
+      if (
+        cancelPendingRecordingRef.current
+        || isUnmountedRef.current
+        || voiceSessionRef.current !== sessionId
+      ) {
         stream.getTracks().forEach((track) => track.stop());
-        recordingStreamRef.current = null;
+        if (recordingStreamRef.current === stream) recordingStreamRef.current = null;
         return;
       }
 
-      const mediaRecorder = new MediaRecorder(stream);
+      const preferredMimeType = preferredRecordingMimeType();
+      const mediaRecorder = preferredMimeType
+        ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      const chunks: Blob[] = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) chunks.push(event.data);
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const recordedMimeType = mediaRecorder.mimeType || chunks[0]?.type || preferredMimeType || 'audio/webm';
+        const audioBlob = new Blob(chunks, { type: recordedMimeType });
         stream.getTracks().forEach(track => track.stop());
         if (recordingStreamRef.current === stream) recordingStreamRef.current = null;
         if (mediaRecorderRef.current === mediaRecorder) mediaRecorderRef.current = null;
         isRecordingRef.current = false;
 
-        if (isUnmountedRef.current) return;
+        if (isUnmountedRef.current || voiceSessionRef.current !== sessionId) return;
 
         setIsRecording(false);
+        isTranscribingRef.current = true;
+        setIsTranscribing(true);
         if (audioBlob.size > 0) {
-          await processAudio(audioBlob);
+          await processAudio(audioBlob, sessionId);
         } else {
+          isTranscribingRef.current = false;
+          setIsTranscribing(false);
           setDebugStatus("No audio captured. Hold the mic button and try again.");
           setAgentStatus("");
         }
       };
 
+      mediaRecorder.onerror = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        if (recordingStreamRef.current === stream) recordingStreamRef.current = null;
+        if (mediaRecorderRef.current === mediaRecorder) mediaRecorderRef.current = null;
+
+        if (isUnmountedRef.current || voiceSessionRef.current !== sessionId) return;
+
+        // Ignore a later onstop event that some browsers dispatch after an
+        // encoder error; partial bytes must never be transcribed as a command.
+        voiceSessionRef.current += 1;
+        isRecordingRef.current = false;
+        isTranscribingRef.current = false;
+        stopLiveTranscript();
+        setIsRecording(false);
+        setIsTranscribing(false);
+        setAgentStatus('Microphone recording failed. Please try again.');
+      };
+
       mediaRecorder.start();
       isRecordingRef.current = true;
       setIsRecording(true);
-      startLiveTranscript();
+      startLiveTranscript(sessionId);
       setDebugStatus("🎤 Listening with Perfect Ear...");
     } catch (err) {
       console.error(err);
@@ -318,9 +424,13 @@ export default function Home() {
       recordingStreamRef.current = null;
       mediaRecorderRef.current = null;
       isRecordingRef.current = false;
+      if (voiceSessionRef.current === sessionId) {
+        isTranscribingRef.current = false;
+      }
 
-      if (!isUnmountedRef.current) {
+      if (!isUnmountedRef.current && voiceSessionRef.current === sessionId) {
         setIsRecording(false);
+        setIsTranscribing(false);
         const errorName = err instanceof DOMException ? err.name : "";
         setDebugStatus(
           errorName === "NotAllowedError"
@@ -333,19 +443,38 @@ export default function Home() {
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = (pointerId?: number) => {
+    if (
+      pointerId !== undefined
+      && activePointerIdRef.current !== null
+      && activePointerIdRef.current !== pointerId
+    ) {
+      return;
+    }
+
     // A quick release while the permission dialog is open used to be ignored
     // because React state had not yet changed to `isRecording`.
     if (isStartingRecordingRef.current && !isRecordingRef.current) {
       cancelPendingRecordingRef.current = true;
+      activePointerIdRef.current = null;
       return;
     }
 
-    if (!isRecordingRef.current) return;
+    if (!isRecordingRef.current) {
+      if (pointerId === undefined || activePointerIdRef.current === pointerId) {
+        activePointerIdRef.current = null;
+      }
+      return;
+    }
 
+    activePointerIdRef.current = null;
     isRecordingRef.current = false;
+    // Set this synchronously, before MediaRecorder dispatches its asynchronous
+    // final data event, so a second press cannot replace this session's bytes.
+    isTranscribingRef.current = true;
     stopLiveTranscript();
     setIsRecording(false);
+    setIsTranscribing(true);
     setDebugStatus("🔄 Whisper AI transcribing...");
 
     const recorder = mediaRecorderRef.current;
@@ -361,12 +490,27 @@ export default function Home() {
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
     recordingStreamRef.current = null;
     mediaRecorderRef.current = null;
+    isTranscribingRef.current = false;
+    setIsTranscribing(false);
+    setDebugStatus("No recording data was captured. Hold the mic button and try again.");
   };
 
+  // Keep window-level safety listeners bound to the latest idempotent stop
+  // function without re-registering them after every render.
+  stopRecordingHandlerRef.current = stopRecording;
+
   const handleRecordPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (
+      !event.isPrimary
+      || (event.pointerType === "mouse" && event.button !== 0)
+      || activePointerIdRef.current !== null
+      || isTranscribingRef.current
+    ) {
+      return;
+    }
 
     event.preventDefault();
+    activePointerIdRef.current = event.pointerId;
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
@@ -376,9 +520,45 @@ export default function Home() {
   };
 
   const handleRecordPointerStop = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (activePointerIdRef.current !== event.pointerId) return;
+
     event.preventDefault();
-    stopRecording();
+    stopRecording(event.pointerId);
   };
+
+  // Pointer capture is reliable in modern browsers, but these lifecycle
+  // fallbacks prevent a microphone from being left on after app switching,
+  // device locking, or a browser losing pointer capture.
+  useEffect(() => {
+    const stopForWindowPointer = (event: PointerEvent) => stopRecordingHandlerRef.current(event.pointerId);
+    const stopForLifecycle = () => {
+      stopRecordingHandlerRef.current();
+      // Returning to a backgrounded tab should never resume a stale command
+      // or generate an app from audio captured before the interruption.
+      voiceSessionRef.current += 1;
+      transcriptionAbortRef.current?.abort();
+      transcriptionAbortRef.current = null;
+      isTranscribingRef.current = false;
+      setIsTranscribing(false);
+    };
+    const stopWhenHidden = () => {
+      if (document.visibilityState === 'hidden') stopForLifecycle();
+    };
+
+    window.addEventListener('pointerup', stopForWindowPointer);
+    window.addEventListener('pointercancel', stopForWindowPointer);
+    window.addEventListener('blur', stopForLifecycle);
+    window.addEventListener('pagehide', stopForLifecycle);
+    document.addEventListener('visibilitychange', stopWhenHidden);
+
+    return () => {
+      window.removeEventListener('pointerup', stopForWindowPointer);
+      window.removeEventListener('pointercancel', stopForWindowPointer);
+      window.removeEventListener('blur', stopForLifecycle);
+      window.removeEventListener('pagehide', stopForLifecycle);
+      document.removeEventListener('visibilitychange', stopWhenHidden);
+    };
+  }, []);
 
   // Keep the interactive UI recoverable even if a serverless connection is
   // interrupted before Vercel can return an error response.
@@ -416,31 +596,57 @@ export default function Home() {
     }
   };
 
-  const processAudio = async (audioBlob: Blob) => {
+  const processAudio = async (audioBlob: Blob, sessionId: number) => {
+    const controller = new AbortController();
+    transcriptionAbortRef.current?.abort();
+    transcriptionAbortRef.current = controller;
+
+    const isCurrentSession = () => (
+      !isUnmountedRef.current
+      && voiceSessionRef.current === sessionId
+      && transcriptionAbortRef.current === controller
+    );
     try {
+      if (!isCurrentSession()) return;
       setAgentStatus("👂 Processing audio...");
       const formData = new FormData();
-      formData.append('file', audioBlob, 'voice.webm');
+      formData.append('file', audioBlob, `voice${extensionForAudioMimeType(audioBlob.type)}`);
 
-      const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (!isCurrentSession()) return;
+      if (!res.ok || data.error) throw new Error(data.error || `Transcription failed (${res.status})`);
 
-      // 🛑 FIX: Whisper er boka boka hallucination kete bad dewa
-      let finalText = data.text.trim();
-      finalText = finalText.replace(/(?:\bthank you\.?\b|\bthanks for watching\.?\b)/gi, '').trim();
+      // The provider's final transcript is canonical. Do not delete phrases
+      // heuristically: valid commands can genuinely contain those words.
+      const finalText = typeof data.text === 'string' ? data.text.trim() : '';
 
       setTranscript(finalText);
 
       if (finalText) {
-        generateAppFlow(finalText, data.language || undefined);
+        await generateAppFlow(finalText, data.language || undefined);
       } else {
         setDebugStatus("⚠️ Kono kotha shunte paini! (Background noise ignored)");
         setAgentStatus("");
       }
-    } catch (err: any) {
-      setAgentStatus(`❌ Transcription Failed: ${err.message}`);
+    } catch (err: unknown) {
+      if (controller.signal.aborted || !isCurrentSession()) return;
+      const message = err instanceof Error ? err.message : 'Unknown transcription error';
+      setAgentStatus(`❌ Transcription Failed: ${message}`);
       setDebugStatus("System Ready");
+    } finally {
+      if (transcriptionAbortRef.current === controller) {
+        transcriptionAbortRef.current = null;
+
+        if (!isUnmountedRef.current && voiceSessionRef.current === sessionId) {
+          isTranscribingRef.current = false;
+          setIsTranscribing(false);
+        }
+      }
     }
   };
 
@@ -797,12 +1003,15 @@ export default function Home() {
             {isRecording && <div className="absolute inset-0 bg-rose-500/20 rounded-full blur-3xl animate-pulse scale-150"></div>}
             <div className="absolute inset-0 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500 -z-10"></div>
             <button
+              type="button"
               onPointerDown={handleRecordPointerDown}
               onPointerUp={handleRecordPointerStop}
               onPointerCancel={handleRecordPointerStop}
               onLostPointerCapture={handleRecordPointerStop}
-              disabled={isGenerating || isDeploying || isDiagnosing}
-              className={`touch-none select-none relative z-10 flex items-center justify-center w-36 h-36 rounded-full transition-all duration-500 ${isGenerating || isDeploying || isDiagnosing ? 'bg-black/60 cursor-not-allowed border border-white/5' :
+              disabled={isGenerating || isDeploying || isDiagnosing || isTranscribing}
+              aria-label={isRecording ? 'Release to finish recording' : isTranscribing ? 'Transcribing voice command' : 'Hold to record a voice command'}
+              aria-pressed={isRecording}
+              className={`touch-none select-none relative z-10 flex items-center justify-center w-36 h-36 rounded-full transition-all duration-500 ${isGenerating || isDeploying || isDiagnosing || isTranscribing ? 'bg-black/60 cursor-not-allowed border border-white/5' :
                   isRecording ? "bg-gradient-to-br from-rose-500 to-red-600 scale-105 shadow-[0_0_50px_rgba(225,29,72,0.5)] border-0" : "bg-gradient-to-br from-indigo-600 to-purple-700 hover:scale-105 hover:shadow-[0_0_50px_rgba(124,58,237,0.5)] border border-white/10"
                 }`}
             >
@@ -826,6 +1035,15 @@ export default function Home() {
               <p className="text-[11px] text-gray-400 mb-3 font-bold uppercase tracking-[0.2em]">Live Transcript</p>
               <p className="text-[15px] text-gray-200 min-h-[3.5rem] font-medium italic leading-relaxed">
                 {transcript || <span className="text-gray-600">Awaiting your command...</span>}
+              </p>
+              <p aria-live="polite" className="mt-3 text-[10px] font-semibold tracking-wide text-gray-500">
+                {isRecording
+                  ? 'Listening — speak naturally, then release the mic.'
+                  : isTranscribing
+                    ? 'Transcribing your command…'
+                    : debugStatus === 'System Ready'
+                      ? 'The final transcript appears after you release the mic.'
+                      : debugStatus}
               </p>
             </div>
 
