@@ -6,8 +6,9 @@
   <p>Built for OpenAI Build Week with GPT-5.6 and Codex.</p>
 
   <p>
-    <a href="https://trynext-ai.vercel.app"><img src="https://img.shields.io/badge/Live_Demo-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Live demo" /></a>
+    <a href="https://trynextai.vercel.app"><img src="https://img.shields.io/badge/Live_Demo-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Live demo" /></a>
     <a href="https://github.com/ranajitdharpersonal/trynextai"><img src="https://img.shields.io/badge/Source-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Source code" /></a>
+    <a href="https://youtu.be/taIk6Ld3ndM"><img src="https://img.shields.io/badge/Watch-Demo_Video-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube demo" /></a>
     <img src="https://img.shields.io/badge/Track-Work_%26_Productivity-2563eb?style=for-the-badge" alt="Work and Productivity track" />
     <img src="https://img.shields.io/badge/License-MIT-10b981?style=for-the-badge" alt="MIT License" />
   </p>
@@ -223,7 +224,9 @@ Generated applications run in the browser sandbox and are deployed as a single H
 
 ## Try the live demo
 
-**Live app:** [trynext-ai.vercel.app](https://trynext-ai.vercel.app)
+- **Live app:** [trynextai.vercel.app](https://trynextai.vercel.app)
+- **Demo video:** [Watch on YouTube](https://youtu.be/taIk6Ld3ndM)
+- **Source code:** [ranajitdharpersonal/trynextai](https://github.com/ranajitdharpersonal/trynextai)
 
 For the required OpenAI Build Week submission video, use a public YouTube recording shorter than three minutes. A strong demo order is:
 
@@ -233,7 +236,7 @@ For the required OpenAI Build Week submission video, use a public YouTube record
 4. deploy the app and show the public URL;
 5. briefly explain where GPT-5.6 ran and how Codex helped build the workflow.
 
-> **Submission reminder:** add the verified current-build YouTube URL to the Devpost project before submitting. The Devpost form also requires the `/feedback` Codex Session ID for the session where most of the core project was built.
+> **Submission reminder:** add the [verified current-build YouTube demo](https://youtu.be/taIk6Ld3ndM) to the Devpost project before submitting. The Devpost form also requires the `/feedback` Codex Session ID for the session where most of the core project was built.
 
 ## Run locally
 
@@ -296,7 +299,7 @@ If a credential is missing, the relevant feature returns an actionable error; th
 - [ ] Select **Work & Productivity** as the category.
 - [ ] Publish a working project description on Devpost.
 - [ ] Add the public repository URL and verify that a clean clone can start from the instructions above.
-- [ ] Add a public YouTube demo under three minutes with audio explaining GPT-5.6 and Codex usage.
+- [ ] Add the public [YouTube demo](https://youtu.be/taIk6Ld3ndM) under three minutes with audio explaining GPT-5.6 and Codex usage.
 - [ ] Add the `/feedback` Codex Session ID requested by the submission form.
 - [ ] Confirm the live URL, repository behavior, and demo video all describe the same build.
 - [ ] Replace any placeholder credentials or links before submitting.
