@@ -57,8 +57,12 @@ const PRIMARY_PROVIDER_BY_ROLE: Record<BrainRole, BrainProvider> = {
 };
 
 const CODE_ROLES = new Set<BrainRole>(["CODER", "MODIFIER", "CLONER"]);
-const OPENAI_CODE_RESPONSE_TOKEN_LIMIT = 5000;
-const BEDROCK_CODE_RESPONSE_TOKEN_LIMIT = 7000;
+// A browser sandbox needs a focused, working first version—not a giant
+// marketing site. Keeping this response budget compact makes non-streaming
+// provider calls likely to finish before the request-level failover timer.
+const OPENAI_CODE_RESPONSE_TOKEN_LIMIT = 2400;
+const BEDROCK_CODE_RESPONSE_TOKEN_LIMIT = 2600;
+const LLAMA_CODE_RESPONSE_TOKEN_LIMIT = 1600;
 
 function providerTimeoutFor(provider: BrainProvider, role: BrainRole): number {
   // Repository scans legitimately need more time than a normal conversational
@@ -68,7 +72,9 @@ function providerTimeoutFor(provider: BrainProvider, role: BrainRole): number {
   const isCodeRequest = CODE_ROLES.has(role);
   if (provider === "OPENAI") return isCodeRequest ? 50_000 : 25_000;
   if (provider === "QWEN") return isCodeRequest ? 40_000 : 25_000;
-  if (provider === "LLAMA") return isCodeRequest ? 15_000 : 20_000;
+  // Llama is deliberately capped to a smaller emergency implementation. A
+  // 15-second deadline was too short to return even a compact HTML document.
+  if (provider === "LLAMA") return isCodeRequest ? 25_000 : 20_000;
   return 20_000;
 }
 
@@ -116,7 +122,9 @@ function providerChain(preferredEngine: string, role: BrainRole): BrainProvider[
 }
 
 function maxTokensFor(provider: Exclude<BrainProvider, "OPENAI">, role: BrainRole): number {
-  if (provider === "LLAMA") return 4000;
+  if (provider === "LLAMA") {
+    return CODE_ROLES.has(role) ? LLAMA_CODE_RESPONSE_TOKEN_LIMIT : 1200;
+  }
   if (provider === "NOVA") return 2200;
   return CODE_ROLES.has(role) ? BEDROCK_CODE_RESPONSE_TOKEN_LIMIT : role === "DOCTOR" ? 6000 : 3000;
 }
@@ -146,6 +154,10 @@ async function callOpenAI(
         // protects the limited demo budget while Bedrock fallbacks retain a
         // larger code budget when a primary request cannot complete.
         max_completion_tokens: CODE_ROLES.has(role) ? OPENAI_CODE_RESPONSE_TOKEN_LIMIT : 2200,
+        // The code-generation path is latency-sensitive. Lower reasoning
+        // leaves enough of the compact output budget for usable HTML instead
+        // of spending the whole request budget on internal deliberation.
+        reasoning_effort: CODE_ROLES.has(role) ? "low" : undefined,
       }),
       signal,
     }),

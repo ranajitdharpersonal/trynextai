@@ -384,7 +384,10 @@ export default function Home() {
   // interrupted before Vercel can return an error response.
   const requestCodeGeneration = async (payload: Record<string, unknown>): Promise<CodeGenerationResponse> => {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 110_000);
+    // The server may make one compact primary attempt and then fall through
+    // to the two configured providers. Leave room for that bounded circuit
+    // instead of aborting the browser request just before its final response.
+    const timeout = window.setTimeout(() => controller.abort(), 130_000);
 
     try {
       const response = await fetch('/api/generate', {
@@ -538,8 +541,8 @@ export default function Home() {
         addLog(`[ARCHITECT] SRS Generated: ${intentData.srs.title || projectType}`);
         
         setAgentStatus(`🎨 Coder Agent building UI...`);
-        addLog(`[CODER] Compiling Tailwind CSS & Glassmorphism UI...`);
-        addLog(`[DATA WIZARD] Injecting LocalStorage Vanilla JS...`);
+        addLog(`[CODER] Building a focused Tailwind UI...`);
+        addLog(`[CODER] Adding only the requested interactions...`);
         
         const coderData = await requestCodeGeneration({
           srs: intentData.srs,
