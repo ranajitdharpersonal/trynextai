@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     // 🧠 MULTI-BRAIN ROUTING (Handled by brain.ts)
     try {
-      const response = await askBrain(prompt, SYSTEM_PROMPT, "OPENAI", "EVALUATOR");
+      const response = await askBrain(prompt, SYSTEM_PROMPT, "AUTO", "EVALUATOR");
       
       // JSON clean and parse
       let cleanText = response.text.replace(/```json/gi, '').replace(/```/g, '').trim();

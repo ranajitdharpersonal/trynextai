@@ -232,7 +232,7 @@ Safety rules:
   const response = await askBrain(
     `Repository: ${owner}/${repo}\nBase branch: ${baseBranch}\nScannable files: ${scannedFiles.length}\n${snapshot}`,
     systemPrompt,
-    "OPENAI",
+    "AUTO",
     "DOCTOR",
   );
 
