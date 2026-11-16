@@ -3,7 +3,7 @@ import {
   ConverseCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 
-export type BrainProvider = "OPENAI" | "NOVA" | "QWEN" | "LLAMA";
+export type BrainProvider = "NOVA" | "QWEN" | "LLAMA";
 
 export type BrainRole =
   | "ROUTER"
@@ -21,14 +21,13 @@ export type BrainResponse = {
   circuitTripped: string | null;
 };
 
-const BEDROCK_MODELS: Record<Exclude<BrainProvider, "OPENAI">, string> = {
+const BEDROCK_MODELS: Record<BrainProvider, string> = {
   NOVA: "us.amazon.nova-2-lite-v1:0",
   QWEN: "qwen.qwen3-coder-next",
   LLAMA: "us.meta.llama3-3-70b-instruct-v1:0",
 };
 
 const MODEL_LABELS: Record<BrainProvider, string> = {
-  OPENAI: "OpenAI GPT-5.6",
   NOVA: "Amazon Nova 2 Lite",
   QWEN: "Qwen3 Coder Next",
   LLAMA: "Llama 3.3 70B Instruct",
@@ -49,9 +48,9 @@ const MODEL_LABELS: Record<BrainProvider, string> = {
 const PRIMARY_PROVIDER_BY_ROLE: Record<BrainRole, BrainProvider> = {
   ROUTER: "NOVA",
   MANAGER: "NOVA",
-  CODER: "OPENAI",
-  MODIFIER: "OPENAI",
-  CLONER: "OPENAI",
+  CODER: "QWEN",
+  MODIFIER: "QWEN",
+  CLONER: "QWEN",
   EVALUATOR: "QWEN",
   DOCTOR: "QWEN",
 };
@@ -60,7 +59,6 @@ const CODE_ROLES = new Set<BrainRole>(["CODER", "MODIFIER", "CLONER"]);
 // A browser sandbox needs a focused, working first version—not a giant
 // marketing site. Keeping this response budget compact makes non-streaming
 // provider calls likely to finish before the request-level failover timer.
-const OPENAI_CODE_RESPONSE_TOKEN_LIMIT = 2400;
 const BEDROCK_CODE_RESPONSE_TOKEN_LIMIT = 2600;
 const LLAMA_CODE_RESPONSE_TOKEN_LIMIT = 1600;
 
@@ -70,7 +68,6 @@ function providerTimeoutFor(provider: BrainProvider, role: BrainRole): number {
   if (role === "DOCTOR") return 90_000;
 
   const isCodeRequest = CODE_ROLES.has(role);
-  if (provider === "OPENAI") return isCodeRequest ? 50_000 : 25_000;
   if (provider === "QWEN") return isCodeRequest ? 40_000 : 25_000;
   // Llama is deliberately capped to a smaller emergency implementation. A
   // 15-second deadline was too short to return even a compact HTML document.
@@ -129,51 +126,6 @@ function maxTokensFor(provider: Exclude<BrainProvider, "OPENAI">, role: BrainRol
   return CODE_ROLES.has(role) ? BEDROCK_CODE_RESPONSE_TOKEN_LIMIT : role === "DOCTOR" ? 6000 : 3000;
 }
 
-async function callOpenAI(
-  prompt: string,
-  systemInstruction: string,
-  role: BrainRole,
-): Promise<string> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) throw new Error("OPENAI_API_KEY missing");
-
-  const response = await withProviderTimeout("OPENAI", role, (signal) =>
-    fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-5.6",
-        messages: [
-          { role: "system", content: systemInstruction },
-          { role: "user", content: prompt },
-        ],
-        // GPT-5.6 is reserved for concise, complete app generation. Its cap
-        // protects the limited demo budget while Bedrock fallbacks retain a
-        // larger code budget when a primary request cannot complete.
-        max_completion_tokens: CODE_ROLES.has(role) ? OPENAI_CODE_RESPONSE_TOKEN_LIMIT : 2200,
-        // The code-generation path is latency-sensitive. Lower reasoning
-        // leaves enough of the compact output budget for usable HTML instead
-        // of spending the whole request budget on internal deliberation.
-        reasoning_effort: CODE_ROLES.has(role) ? "low" : undefined,
-      }),
-      signal,
-    }),
-  );
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message || "OpenAI request failed");
-
-  const text = data.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) {
-    throw new Error("OpenAI returned an empty response");
-  }
-
-  return text.trim();
-}
-
 async function callBedrock(
   provider: Exclude<BrainProvider, "OPENAI">,
   prompt: string,
@@ -220,16 +172,17 @@ async function callBedrock(
 }
 
 /**
- * Run one role-aware request through the three-tier provider circuit:
+ * Run one role-aware request through the AWS Bedrock provider circuit:
  * primary role model → Qwen3 Coder Next → Llama 3.3.
  *
- * Passing `preferredEngine` as QWEN or LLAMA is supported for explicit
- * failover/testing, while the default OPENAI entry uses the role map above.
+ * Nova is used for lightweight routing and planning. Code generation,
+ * modification, cloning, evaluation, and repository diagnosis use Qwen
+ * first, with Llama as the fallback.
  */
 export async function askBrain(
   prompt: string,
   systemInstruction: string = "You are an expert AI.",
-  preferredEngine: string = "OPENAI",
+  preferredEngine: string = "AUTO",
   role: BrainRole = "CODER",
 ): Promise<BrainResponse> {
   const providers = providerChain(preferredEngine, role);
@@ -237,10 +190,12 @@ export async function askBrain(
 
   for (const provider of providers) {
     try {
-      const text =
-        provider === "OPENAI"
-          ? await callOpenAI(prompt, systemInstruction, role)
-          : await callBedrock(provider, prompt, systemInstruction, role);
+      const text = await callBedrock(
+        provider,
+        prompt,
+        systemInstruction,
+        role,
+      );
 
       return {
         text,
@@ -255,5 +210,5 @@ export async function askBrain(
     }
   }
 
-  throw new Error("ALL SYSTEMS CRASHED! No configured LLM available.");
+  throw new Error("ALL SYSTEMS CRASHED! No configured AWS Bedrock model available.");
 }
