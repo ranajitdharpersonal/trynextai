@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     // 🧠 MULTI-BRAIN ROUTING (The Master Engine)
     try {
-      const response = await askBrain(userInstruction, SYSTEM_PROMPT, "OPENAI", "MODIFIER");
+      const response = await askBrain(userInstruction, SYSTEM_PROMPT, "AUTO", "MODIFIER");
       
       // Clean markdown tags
       let htmlCode = response.text.replace(/```html/gi, '').replace(/```/g, '').trim();
