@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      const response = await askBrain(prompt, SYSTEM_PROMPT, 'OPENAI', 'CODER');
+      const response = await askBrain(prompt, SYSTEM_PROMPT, 'AUTO', 'CODER');
       const htmlCode = response.text.replace(/```html/gi, '').replace(/```/g, '').trim();
 
       // A completion cut off at its output limit often looks like usable HTML
