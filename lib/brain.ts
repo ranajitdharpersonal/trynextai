@@ -34,16 +34,13 @@ const MODEL_LABELS: Record<BrainProvider, string> = {
 };
 
 /**
- * The primary tier is intentionally role-aware to control cost without
- * making the GPT-5.6 integration decorative:
- *
+ * The primary tier is role-aware:
  * - Nova 2 Lite handles lightweight routing and requirement planning.
- * - GPT-5.6 handles code generation, modification, and cloning.
- * - Qwen3 Coder Next handles QA and repository repair.
+ * - Qwen3 Coder Next handles code generation, modification, cloning, QA,
+ *   and repository diagnosis.
+ * - Llama 3.3 is the fallback model.
  *
- * If the selected primary provider fails, the same request falls through to
- * Qwen3 Coder Next and then Llama 3.3. A circuit is request-scoped; no global
- * provider state is persisted between users or requests.
+ * A circuit is request-scoped; no global provider state is persisted.
  */
 const PRIMARY_PROVIDER_BY_ROLE: Record<BrainRole, BrainProvider> = {
   ROUTER: "NOVA",
@@ -118,7 +115,7 @@ function providerChain(preferredEngine: string, role: BrainRole): BrainProvider[
   return [...new Set(chain)];
 }
 
-function maxTokensFor(provider: Exclude<BrainProvider, "OPENAI">, role: BrainRole): number {
+function maxTokensFor(provider: BrainProvider, role: BrainRole): number {
   if (provider === "LLAMA") {
     return CODE_ROLES.has(role) ? LLAMA_CODE_RESPONSE_TOKEN_LIMIT : 1200;
   }
@@ -127,7 +124,7 @@ function maxTokensFor(provider: Exclude<BrainProvider, "OPENAI">, role: BrainRol
 }
 
 async function callBedrock(
-  provider: Exclude<BrainProvider, "OPENAI">,
+  provider: BrainProvider,
   prompt: string,
   systemInstruction: string,
   role: BrainRole,
