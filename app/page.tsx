@@ -667,7 +667,7 @@ export default function Home() {
       });
       const decision = await routerRes.json();
       
-      const activeEngine = decision.source || "OPENAI"; 
+      const activeEngine = decision.source || "NOVA"; 
       const localizedCompletion = typeof decision.successMessage === "string" && decision.successMessage.trim()
         ? decision.successMessage
         : "Your project is ready! Do you want to make any modifications or publish it?";
@@ -1098,7 +1098,7 @@ export default function Home() {
                         <span className="text-[18px] opacity-90 drop-shadow-md">🔨</span>
                         <div className="flex flex-col">
                           <span className="font-bold text-gray-200 text-[11px] tracking-wide">Coder Agent</span>
-                          <span className="text-[9px] text-gray-500 uppercase tracking-widest mt-0.5">GPT-5.6 · UI/UX & Logic</span>
+                          <span className="text-[9px] text-gray-500 uppercase tracking-widest mt-0.5">Qwen3 Coder Next · UI/UX & Logic</span>
                         </div>
                       </div>
                       
