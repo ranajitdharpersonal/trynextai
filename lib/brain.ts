@@ -4,7 +4,6 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 
 export type BrainProvider = "NOVA" | "QWEN" | "LLAMA";
-
 export type BrainRole =
   | "ROUTER"
   | "MANAGER"
@@ -33,15 +32,6 @@ const MODEL_LABELS: Record<BrainProvider, string> = {
   LLAMA: "Llama 3.3 70B Instruct",
 };
 
-/**
- * The primary tier is role-aware:
- * - Nova 2 Lite handles lightweight routing and requirement planning.
- * - Qwen3 Coder Next handles code generation, modification, cloning, QA,
- *   and repository diagnosis.
- * - Llama 3.3 is the fallback model.
- *
- * A circuit is request-scoped; no global provider state is persisted.
- */
 const PRIMARY_PROVIDER_BY_ROLE: Record<BrainRole, BrainProvider> = {
   ROUTER: "NOVA",
   MANAGER: "NOVA",
@@ -53,22 +43,17 @@ const PRIMARY_PROVIDER_BY_ROLE: Record<BrainRole, BrainProvider> = {
 };
 
 const CODE_ROLES = new Set<BrainRole>(["CODER", "MODIFIER", "CLONER"]);
-// A browser sandbox needs a focused, working first version—not a giant
-// marketing site. Keeping this response budget compact makes non-streaming
-// provider calls likely to finish before the request-level failover timer.
-const BEDROCK_CODE_RESPONSE_TOKEN_LIMIT = 2600;
-const LLAMA_CODE_RESPONSE_TOKEN_LIMIT = 1600;
+
+// Bedrock model-card limits: Qwen3 Coder Next 16K; Llama 3.3 70B 4K.
+// Use conservative budgets below those documented maximums.
+const QWEN_CODE_RESPONSE_TOKEN_LIMIT = 8192;
+const LLAMA_CODE_RESPONSE_TOKEN_LIMIT = 4096;
 
 function providerTimeoutFor(provider: BrainProvider, role: BrainRole): number {
-  // Repository scans legitimately need more time than a normal conversational
-  // request, while interactive app generation must stay bounded for the UI.
   if (role === "DOCTOR") return 90_000;
-
   const isCodeRequest = CODE_ROLES.has(role);
-  if (provider === "QWEN") return isCodeRequest ? 40_000 : 25_000;
-  // Llama is deliberately capped to a smaller emergency implementation. A
-  // 15-second deadline was too short to return even a compact HTML document.
-  if (provider === "LLAMA") return isCodeRequest ? 25_000 : 20_000;
+  if (provider === "QWEN") return isCodeRequest ? 90_000 : 25_000;
+  if (provider === "LLAMA") return isCodeRequest ? 60_000 : 20_000;
   return 20_000;
 }
 
@@ -85,7 +70,9 @@ async function withProviderTimeout<T>(
     return await request(controller.signal);
   } catch (error) {
     if (controller.signal.aborted) {
-      throw new Error(`${MODEL_LABELS[provider]} timed out after ${timeoutMs / 1000} seconds`);
+      throw new Error(
+        `${MODEL_LABELS[provider]} timed out after ${timeoutMs / 1000} seconds`,
+      );
     }
     throw error;
   } finally {
@@ -111,7 +98,6 @@ function providerChain(preferredEngine: string, role: BrainRole): BrainProvider[
   const chain: BrainProvider[] = [primary];
   if (primary !== "QWEN" && primary !== "LLAMA") chain.push("QWEN");
   if (primary !== "LLAMA") chain.push("LLAMA");
-
   return [...new Set(chain)];
 }
 
@@ -119,8 +105,12 @@ function maxTokensFor(provider: BrainProvider, role: BrainRole): number {
   if (provider === "LLAMA") {
     return CODE_ROLES.has(role) ? LLAMA_CODE_RESPONSE_TOKEN_LIMIT : 1200;
   }
-  if (provider === "NOVA") return 2200;
-  return CODE_ROLES.has(role) ? BEDROCK_CODE_RESPONSE_TOKEN_LIMIT : role === "DOCTOR" ? 6000 : 3000;
+  if (provider === "QWEN") {
+    return CODE_ROLES.has(role)
+      ? QWEN_CODE_RESPONSE_TOKEN_LIMIT
+      : role === "DOCTOR" ? 6000 : 3000;
+  }
+  return 2200;
 }
 
 async function callBedrock(
@@ -142,8 +132,6 @@ async function callBedrock(
     credentials: { accessKeyId, secretAccessKey },
   });
 
-  // Converse provides one model-agnostic Bedrock contract for Nova, Qwen,
-  // and Llama, avoiding provider-specific prompt/response assumptions.
   const command = new ConverseCommand({
     modelId: BEDROCK_MODELS[provider],
     system: [{ text: systemInstruction }],
@@ -160,39 +148,42 @@ async function callBedrock(
   );
   const content = response.output?.message?.content || [];
   const text = content
-    .map((block) => ("text" in block && typeof block.text === "string" ? block.text : ""))
+    .map((block) =>
+      "text" in block && typeof block.text === "string" ? block.text : "",
+    )
     .join("")
     .trim();
 
-  if (!text) throw new Error(`${MODEL_LABELS[provider]} returned an empty response`);
+  if (!text) {
+    throw new Error(`${MODEL_LABELS[provider]} returned an empty response`);
+  }
   return text;
 }
 
 /**
- * Run one role-aware request through the AWS Bedrock provider circuit:
- * primary role model → Qwen3 Coder Next → Llama 3.3.
- *
- * Nova is used for lightweight routing and planning. Code generation,
- * modification, cloning, evaluation, and repository diagnosis use Qwen
- * first, with Llama as the fallback.
+ * Optional validation is evaluated inside the provider loop. Invalid or
+ * truncated output is treated as a provider failure, so the next provider
+ * gets a chance. Existing callers remain compatible without a validator.
  */
 export async function askBrain(
   prompt: string,
   systemInstruction: string = "You are an expert AI.",
   preferredEngine: string = "AUTO",
   role: BrainRole = "CODER",
+  validateResponse?: (text: string) => boolean,
 ): Promise<BrainResponse> {
   const providers = providerChain(preferredEngine, role);
   const failures: string[] = [];
 
   for (const provider of providers) {
     try {
-      const text = await callBedrock(
-        provider,
-        prompt,
-        systemInstruction,
-        role,
-      );
+      const text = await callBedrock(provider, prompt, systemInstruction, role);
+
+      if (validateResponse && !validateResponse(text)) {
+        throw new Error(
+          `${MODEL_LABELS[provider]} returned incomplete or invalid output`,
+        );
+      }
 
       return {
         text,
@@ -207,5 +198,7 @@ export async function askBrain(
     }
   }
 
-  throw new Error("ALL SYSTEMS CRASHED! No configured AWS Bedrock model available.");
+  throw new Error(
+    `ALL SYSTEMS CRASHED! ${failures.join(" | ") || "No configured AWS Bedrock model available."}`,
+  );
 }

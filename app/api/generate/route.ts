@@ -13,13 +13,32 @@ Build a focused first version, not a large product demo:
 5. Keep markup and JavaScript concise. The entire response must stay under 8,000 characters.
 6. Return only raw HTML beginning with <!doctype html>; do not use markdown fences or explain your work.`;
 
+function cleanGeneratedHtml(value: string): string {
+  return value
+    .replace(/^```(?:html)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+}
+
+function isCompleteHtml(value: string): boolean {
+  const html = cleanGeneratedHtml(value);
+  return (
+    /^<!doctype html(?:\s|>)/i.test(html) &&
+    /<html(?:\s|>)/i.test(html) &&
+    /<\/body>\s*<\/html>\s*$/i.test(html)
+  );
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { srs, previousCode, qaFeedback } = body;
 
     if (!srs) {
-      return NextResponse.json({ error: 'SRS data asheni boss!' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'SRS data asheni boss!' },
+        { status: 400 },
+      );
     }
 
     let prompt = `Here is the SRS to build:\n${JSON.stringify(srs, null, 2)}`;
@@ -33,19 +52,28 @@ export async function POST(req: Request) {
     }
 
     try {
-      const response = await askBrain(prompt, SYSTEM_PROMPT, 'AUTO', 'CODER');
-      const htmlCode = response.text.replace(/```html/gi, '').replace(/```/g, '').trim();
+      // Invalid/truncated Qwen output is rejected inside askBrain, which then
+      // automatically attempts the existing Llama fallback.
+      const response = await askBrain(
+        prompt,
+        SYSTEM_PROMPT,
+        'AUTO',
+        'CODER',
+        isCompleteHtml,
+      );
 
-      // A completion cut off at its output limit often looks like usable HTML
-      // until QA tries to repair it. Reject it here so a partial provider
-      // response cannot trigger another full paid generation pass.
-      if (!/^<!doctype html/i.test(htmlCode) || !/<\/html>\s*$/i.test(htmlCode)) {
-        return NextResponse.json({
-          error: 'The Coder response was incomplete, so it was not sent to QA or deployed. Please retry the compact request.',
-          source: response.modelUsed,
-          circuitTripped: response.circuitTripped,
-          retryable: true,
-        }, { status: 502 });
+      const htmlCode = cleanGeneratedHtml(response.text);
+
+      if (!isCompleteHtml(htmlCode)) {
+        return NextResponse.json(
+          {
+            error: 'The Coder response was incomplete, so it was not sent to QA or deployed. Please retry the compact request.',
+            source: response.modelUsed,
+            circuitTripped: response.circuitTripped,
+            retryable: true,
+          },
+          { status: 502 },
+        );
       }
 
       return NextResponse.json({
@@ -54,24 +82,28 @@ export async function POST(req: Request) {
         circuitTripped: response.circuitTripped,
       });
     } catch (brainError: unknown) {
-      const circuitTripped = brainError instanceof Error
-        ? brainError.message
-        : 'ALL SYSTEMS CRASHED';
+      const circuitTripped =
+        brainError instanceof Error
+          ? brainError.message
+          : 'ALL SYSTEMS CRASHED';
 
       console.error('All code-generation providers failed:', circuitTripped);
 
-      // Never return emergency-page HTML as generated code. Doing that caused
-      // the browser to run QA and a second paid repair attempt against an
-      // error page rather than stopping with a retryable failure.
-      return NextResponse.json({
-        error: 'No AI provider finished generating this app. Nothing was sent to QA or deployed; please retry once the providers are available.',
-        source: 'All providers failed',
-        circuitTripped,
-        retryable: true,
-      }, { status: 503 });
+      return NextResponse.json(
+        {
+          error: 'No AI provider finished generating this app. Nothing was sent to QA or deployed; please retry once the providers are available.',
+          source: 'All providers failed',
+          circuitTripped,
+          retryable: true,
+        },
+        { status: 503 },
+      );
     }
   } catch (error) {
     console.error('Code-generation request failed:', error);
-    return NextResponse.json({ error: 'Server-e code generate korte giye jhamela hoyeche!' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Server-e code generate korte giye jhamela hoyeche!' },
+      { status: 500 },
+    );
   }
 }
